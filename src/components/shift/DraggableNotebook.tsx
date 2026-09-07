@@ -5,9 +5,9 @@ import { colors } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { scale, verticalScale, moderateScale, screenDimensions } from '../../utils/responsive';
 
-// DIMENSIONES MASIVAS DEL CUADERNO (85% ANCHO, 65% ALTO)
-const NOTEBOOK_WIDTH = screenDimensions.width * 0.85;
-const NOTEBOOK_HEIGHT = screenDimensions.height * 0.65;
+// DIMENSIONES DEL CUADERNO (65% ANCHO, 50% ALTO — compacto para no tapar la caja)
+const NOTEBOOK_WIDTH = screenDimensions.width * 0.65;
+const NOTEBOOK_HEIGHT = screenDimensions.height * 0.50;
 
 // LÍMITES MATEMÁTICOS DE ARRASTRE
 const MIN_X = scale(6);
@@ -16,7 +16,7 @@ const MIN_Y = screenDimensions.counterHeight * 0.25;
 const MAX_Y = screenDimensions.height - verticalScale(70);
 
 const INITIAL_X = scale(12);
-const INITIAL_Y = screenDimensions.height - verticalScale(110);
+const INITIAL_Y = screenDimensions.height - NOTEBOOK_HEIGHT - verticalScale(80);
 
 export const DraggableNotebook = () => {
   const pan = useRef(new Animated.ValueXY({ x: INITIAL_X, y: INITIAL_Y })).current;

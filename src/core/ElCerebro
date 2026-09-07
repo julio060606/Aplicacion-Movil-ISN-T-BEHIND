@@ -1,7 +1,0 @@
-/core (El Cerebro - Modelos puros en TS): Aquí no existe React. Solo clases u objetos que manejan datos y reglas matemáticas.
-
-EstadoJuego.ts: Maneja el dinero, la hora, la salud del jugador.
-
-ReglasValidacion.ts: Funciones puras. Reciben datos de un documento y devuelven true/false.
-
-GeneradorClientes.ts: Lógica que decide qué cliente viene y qué documentos trae.

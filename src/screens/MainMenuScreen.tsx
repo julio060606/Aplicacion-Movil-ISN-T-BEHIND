@@ -1,23 +1,41 @@
-// src/screens/MainMenuScreen.tsx
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, SafeAreaView, Text, StatusBar } from 'react-native';
+import { DrawerActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../models/types';
 import { TitleSvg } from '../components/menu/TitleSvg';
 import { LogoSvg } from '../components/menu/LogoSvg';
 import { colors } from '../theme/colors';
 import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import { TYPOGRAPHY } from '../theme/typography';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
+type Props = NativeStackScreenProps<RootStackParamList, any>;
 
 export const MainMenuScreen = ({ navigation }: Props) => {
   const handleStartStory = () => {
-    navigation.navigate('WeeklyIntro', { weekNumber: 1 });
+    navigation.navigate('OperatorRegistration');
+  };
+
+  const handleOpenSettings = () => {
+    (navigation as any).navigate('Settings');
+  };
+
+  const handleOpenDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+
+      {/* BOTÓN SUPERIOR DE APERTURA DEL DRAWER */}
+      <TouchableOpacity
+        style={styles.drawerButton}
+        activeOpacity={0.7}
+        onPress={handleOpenDrawer}
+      >
+        <Text style={styles.drawerButtonText}>[ ☰ PANEL CST ]</Text>
+      </TouchableOpacity>
 
       <View style={styles.mainContainer}>
         {/* COLUMNA IZQUIERDA: LOGO INDUSTRIAL GIRATORIO */}
@@ -41,12 +59,16 @@ export const MainMenuScreen = ({ navigation }: Props) => {
             >
               <View style={styles.lineWrapper}>
                 <View style={styles.customLine} />
-                <Text style={styles.menuOptionText}>[ STORY ]</Text>
+                <Text style={styles.menuOptionText}>[ STORY / ACCESO ]</Text>
                 <View style={styles.customLine} />
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.buttonWrapper} activeOpacity={0.6}>
+            <TouchableOpacity
+              style={styles.buttonWrapper}
+              activeOpacity={0.6}
+              onPress={handleOpenSettings}
+            >
               <View style={styles.lineWrapper}>
                 <View style={styles.customLine} />
                 <Text style={styles.menuOptionText}>[ SETTINGS ]</Text>
@@ -54,10 +76,14 @@ export const MainMenuScreen = ({ navigation }: Props) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.buttonWrapper} activeOpacity={0.6}>
+            <TouchableOpacity
+              style={styles.buttonWrapper}
+              activeOpacity={0.6}
+              onPress={() => (navigation as any).navigate('ManualDossier')}
+            >
               <View style={styles.lineWrapper}>
                 <View style={styles.customLine} />
-                <Text style={styles.menuOptionText}>[ EXIT ]</Text>
+                <Text style={styles.menuOptionText}>[ EXPEDIENTE CST ]</Text>
                 <View style={styles.customLine} />
               </View>
             </TouchableOpacity>
@@ -65,10 +91,13 @@ export const MainMenuScreen = ({ navigation }: Props) => {
 
           {/* Créditos / Pie de terminal */}
           <View style={styles.footerSection}>
-            <TouchableOpacity activeOpacity={0.6}>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={handleOpenDrawer}
+            >
               <View style={styles.lineWrapper}>
                 <View style={[styles.customLine, styles.dimmedLine]} />
-                <Text style={styles.footerButtonText}>credits</Text>
+                <Text style={styles.footerButtonText}>ver menú lateral [DRAWER]</Text>
                 <View style={[styles.customLine, styles.dimmedLine]} />
               </View>
             </TouchableOpacity>
@@ -83,6 +112,24 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  drawerButton: {
+    position: 'absolute',
+    top: verticalScale(14),
+    left: scale(16),
+    zIndex: 20,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 4,
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4),
+  },
+  drawerButtonText: {
+    fontFamily: TYPOGRAPHY.systemPC,
+    fontSize: moderateScale(9),
+    color: colors.crtAmber,
+    letterSpacing: 0.5,
   },
   mainContainer: {
     flex: 1,

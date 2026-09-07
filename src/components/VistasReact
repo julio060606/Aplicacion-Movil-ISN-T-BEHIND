@@ -1,1 +1,0 @@
-/components (El Cuerpo - Vistas de React): Solo reciben datos por props y los pintan. No saben por qué el dinero baja, solo saben pintar el número que les des.

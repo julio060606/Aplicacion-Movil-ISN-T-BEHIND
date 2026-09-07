@@ -3,28 +3,30 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import { colors } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
-import { scale, verticalScale, moderateScale, screenDimensions } from '../../utils/responsive';
+import { figmaH, figmaW, moderateScale, scale, verticalScale } from '../../utils/responsive';
 
-const OVERLAY_HEIGHT = screenDimensions.height * 0.52;
-const TAB_HEIGHT = verticalScale(32);
+interface CashRegisterOverlayProps {
+  disabled?: boolean;
+}
+
+const OVERLAY_HEIGHT = figmaH(454); // Altura calibrada al 52% del lienzo de 873.5px
+const TAB_HEIGHT = verticalScale(34);
 
 /**
  * =========================================================================
  * CAJA REGISTRADORA / OVERLAY DESLIZABLE (CASH REGISTER OVERLAY)
  * =========================================================================
- * Tipografía:
- * - Pantalla y Monedas: TYPOGRAPHY.digitalSecondary (Orbitron)
- * - Botones y Etiquetas: TYPOGRAPHY.digitalMain (Chakra Petch)
  */
-export const CashRegisterOverlay = () => {
+export const CashRegisterOverlay: React.FC<CashRegisterOverlayProps> = ({ disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const toggleRegister = () => {
+    if (disabled) return;
     if (isOpen) {
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 350,
+        duration: 300,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start(() => setIsOpen(false));
@@ -39,6 +41,7 @@ export const CashRegisterOverlay = () => {
     }
   };
 
+  // Cuando está cerrada (0), se desplaza hacia abajo dejando solo la pestaña visible
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [OVERLAY_HEIGHT - TAB_HEIGHT, 0],
@@ -52,11 +55,13 @@ export const CashRegisterOverlay = () => {
           transform: [{ translateY }],
         },
       ]}
+      pointerEvents={disabled ? 'none' : 'box-none'}
     >
       {/* PESTAÑA SUPERIOR DE APERTURA / CIERRE */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={toggleRegister}
+        disabled={disabled}
         style={styles.handleTab}
       >
         <Text style={styles.handleText}>

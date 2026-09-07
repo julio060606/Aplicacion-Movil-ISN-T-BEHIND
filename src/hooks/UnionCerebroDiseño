@@ -1,3 +1,0 @@
-/hooks (El Controlador - El pegamento): Unen el cerebro con el cuerpo.
-
-useGameEngine.ts: Un Custom Hook que usa useState o useReducer para suscribir la Vista a los cambios del Core.

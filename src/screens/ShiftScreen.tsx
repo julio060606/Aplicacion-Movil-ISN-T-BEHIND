@@ -1,13 +1,38 @@
-// src/screens/ShiftScreen.tsx
-import React from 'react';
-import { View, Text, StyleSheet, StatusBar, SafeAreaView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  Image,
+  Animated,
+  PanResponder,
+  Easing,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../models/types';
 import { colors } from '../theme/colors';
 import { TYPOGRAPHY } from '../theme/typography';
-import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import {
+  figmaX,
+  figmaY,
+  figmaW,
+  figmaH,
+  moderateScale,
+  scale,
+  verticalScale,
+} from '../utils/responsive';
 
-// Componentes flotantes con mecánicas diegéticas
+// Componentes diegéticos
+import { GameBackground } from '../components/shift/GameBackground';
+import { CustomerArea } from '../components/shift/CustomerArea';
+import { ProtectionGrille } from '../components/shift/ProtectionGrille';
+import { RollUpDoor } from '../components/shift/RollUpDoor';
+import { DeskWorkstation } from '../components/shift/DeskWorkstation';
+import { DeskDrawers } from '../components/shift/DeskDrawers';
+import { InventoryBox } from '../components/shift/InventoryBox';
 import { PcAndFaxStation } from '../components/shift/PcAndFaxStation';
 import { DraggableNotebook } from '../components/shift/DraggableNotebook';
 import { CashRegisterOverlay } from '../components/shift/CashRegisterOverlay';
@@ -16,364 +41,503 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GameInterface' | 'Shift
 
 /**
  * =========================================================================
- * SHIFTSCREEN (PANTALLA DE TURNO DIEGÉTICA & MODO INMERSIVO)
+ * SHIFTSCREEN (LIENZO MATEMÁTICO FIGMA 412 x 873.5 - MODO INMERSIVO)
  * =========================================================================
- * Layout: Flexbox base con Split 40% (Top) y 60% (Bottom) dividido por línea roja.
- * Tipografía: Sistema unificado TYPOGRAPHY (Contexto Corporativo Y2K / Años 2000).
+ * - Bloqueo vertical 100% y centrado horizontal en tablets.
+ * - Recorte estricto (overflow: 'hidden') en el ancho de los Color Boxes (412px base).
+ * - Componentes integrados y apilamiento estricto:
+ *   1. Fondo de la Habitación (game_background.webp, zIndex: 0).
+ *   2. Color Boxes de Referencia (15%, 25%, 35%, 25% con opacidad 0.30, zIndex: 1).
+ *   3. Cliente en Ventanilla (character_client_1.webp, zIndex: 2).
+ *   4. Reja de Protección (protection_grille.webp, zIndex: 4).
+ *   5. Caja de Inventario (inventory_box.webp, zIndex: 5, inferior a la mesa).
+ *   6. Cajones Inferiores (desk_under_workstation zIndex: 6, cajones zIndex: 7, 8).
+ *   7. Plataforma de la Mesa (desk_workstation.webp, zIndex: 10).
+ *   8. Línea divisoria roja (Y = 349.5px, zIndex: 12).
+ *   9. Persiana Enrollable (roll-up door con cabezal estático y física, zIndex: 25).
+ *  10. PC Station con Modal (pc_station.webp, zIndex: 40).
+ *  11. Cuaderno Compacto (aparece/desaparece con Hold en Cajón Izquierdo, zIndex: 48).
+ *  12. Caja Registradora (CashRegisterOverlay calibrada al fondo, zIndex: 60).
  */
-export const ShiftScreen = ({ route }: Props) => {
+// =========================================================================
+// FILTRO DIEGÉTICO / ATMOSFÉRICO DE PANTALLA COMPLETA (#34495E)
+// =========================================================================
+// Cambiar a false para desactivar el filtro de la pantalla móvil:
+const ENABLE_SCREEN_FILTER = true;
+// Color #34495E con opacidad al 53% (rango solicitado 50% - 56%):
+const SCREEN_FILTER_COLOR = 'rgba(52, 73, 94, 0.53)';
+
+export const ShiftScreen: React.FC<Props> = ({ route }) => {
   const currentDay = route.params && 'currentDay' in route.params ? route.params.currentDay : 1;
 
+  // Estados de interacción
+  const [isNotebookVisible, setIsNotebookVisible] = useState(false);
+  const [isGunDrawn, setIsGunDrawn] = useState(false);
+  const [areDrawersOpen, setAreDrawersOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isDoorClosed, setIsDoorClosed] = useState(false);
+
+  const isDoorClosedRef = useRef(false);
+  useEffect(() => { isDoorClosedRef.current = isDoorClosed; }, [isDoorClosed]);
+
+  const isGunDrawnRef = useRef(false);
+  useEffect(() => { isGunDrawnRef.current = isGunDrawn; }, [isGunDrawn]);
+
+  // Animaciones de cámara para Inspección Top 25% (Opción B: Zoom global)
+  const zoomScale = useRef(new Animated.Value(1)).current;
+  const cameraTranslateY = useRef(new Animated.Value(0)).current;
+  const cameraPanX = useRef(new Animated.Value(0)).current;
+  const inspectOpacity = useRef(new Animated.Value(1)).current;
+  const isInspecting = useRef(false);
+
+  const MAX_PAN_X = figmaW(160);
+
+  const startInspection = () => {
+    isInspecting.current = true;
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    Animated.parallel([
+      Animated.spring(zoomScale, {
+        toValue: 1.7,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cameraTranslateY, {
+        toValue: figmaY(185),
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.timing(inspectOpacity, {
+        toValue: 0.18,
+        duration: 250,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const endInspection = () => {
+    if (!isInspecting.current) return;
+    isInspecting.current = false;
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    Animated.parallel([
+      Animated.spring(zoomScale, {
+        toValue: 1,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cameraTranslateY, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cameraPanX, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(inspectOpacity, {
+        toValue: 1,
+        duration: 250,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const inspectPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () =>
+        !isDoorClosedRef.current && !isGunDrawnRef.current,
+      onMoveShouldSetPanResponder: () =>
+        isInspecting.current && !isDoorClosedRef.current && !isGunDrawnRef.current,
+
+      onPanResponderGrant: () => {
+        startInspection();
+      },
+
+      onPanResponderMove: (_, gestureState) => {
+        if (!isInspecting.current) return;
+        const targetX = gestureState.dx;
+        const clampedX = Math.min(Math.max(targetX, -MAX_PAN_X), MAX_PAN_X);
+        cameraPanX.setValue(clampedX);
+      },
+
+      onPanResponderRelease: () => {
+        endInspection();
+      },
+      onPanResponderTerminate: () => {
+        endInspection();
+      },
+    })
+  ).current;
+
+  const toggleNotebook = () => {
+    setIsNotebookVisible((prev) => !prev);
+  };
+
+  const toggleGun = () => {
+    setIsGunDrawn((prev) => !prev);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.fullScreen}>
       <StatusBar hidden={true} />
 
-      <View style={styles.rootContainer}>
-        {/* =========================================================
-            1. TOP_ZONE (flex: 0.4 - 40% SUPERIOR)
-            ========================================================= */}
-        <View style={styles.topZone}>
-          {/* Top15Zone (flex: 15/40): Espejo, Centro Vacío, CCTV/Reloj */}
-          <View style={styles.top15Zone}>
-            {/* Espejo Convexo (Izquierda) */}
-            <View style={styles.mirrorBox}>
-              <Text style={styles.boxLabel}>ESPEJO CONVEXO</Text>
-              <Text style={styles.subLabel}>[ VIGILANCIA ATRÁS ]</Text>
-            </View>
+      <View style={styles.screenWrapper}>
+        <View style={styles.stageContainer}>
+          {/* =========================================================
+              CÁMARA GLOBAL DE ESCENARIO (ZOOM + PANEO DE INSPECCIÓN)
+              ========================================================= */}
+          <Animated.View
+            style={[
+              styles.cameraContainer,
+              {
+                transform: [
+                  { scale: zoomScale },
+                  { translateX: cameraPanX },
+                  { translateY: cameraTranslateY },
+                ],
+              },
+            ]}
+          >
+            {/* =========================================================
+                0. FONDO DE LA HABITACIÓN / ESCENARIO - zIndex: 0
+                ========================================================= */}
+            <GameBackground />
 
-            {/* Espacio Central Vacío / Alerta */}
-            <View style={styles.topCenterEmpty}>
-              <Text style={styles.centerDrafterText}>TURNO: DÍA {currentDay}</Text>
-            </View>
-
-            {/* Contenedor CCTV / Reloj (Derecha) */}
-            <View style={styles.cctvClockBox}>
-              <Text style={styles.cctvLabel}>CCTV // RELOJ</Text>
-              <Text style={styles.clockText}>00:00 AM</Text>
-              <Text style={styles.cctvStatus}>[ CAM-01: ACTIVA ]</Text>
-            </View>
-          </View>
-
-          {/* Top25Zone (flex: 25/40): Mostrador y Sprite del Cliente */}
-          <View style={styles.top25Zone}>
-            <View style={styles.clientSpriteBox}>
-              <Text style={styles.clientLabel}>SPRITE DEL CLIENTE / VISITANTE</Text>
-              <Text style={styles.clientStatus}>[ ÁREA DE ATENCIÓN DE VENTANILLA ]</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* =========================================================
-            2. LÍNEA ROJA DIVISORIA DIEGÉTICA (height: 4, #641111)
-            ========================================================= */}
-        <View style={styles.redDividerLine} />
-
-        {/* =========================================================
-            3. BOTTOM_ZONE (flex: 0.6 - 60% INFERIOR)
-            ========================================================= */}
-        <View style={styles.bottomZone}>
-          {/* Bottom35Zone (flex: 35/60): Escritorio, Carrusel Expandido y Herramientas */}
-          <View style={styles.bottom35Zone}>
-            {/* Carrusel Central de Documentos (Expandido flex: 1) */}
-            <View style={styles.docCarouselBox}>
-              <Text style={styles.docCarouselTitle}>ZONA CARRUSEL DE DOCUMENTOS (EXPANDIDO)</Text>
-              <Text style={styles.docCarouselSub}>
-                [ EXPEDIENTES / PASAPORTES / FORMULARIOS Y REGISTROS ]
-              </Text>
-            </View>
-
-            {/* Zona de Herramientas (Lámpara UV y Teclado) */}
-            <View style={styles.toolsRack}>
-              <View style={styles.uvLampBox}>
-                <Text style={styles.toolLabel}>LÁMPARA UV</Text>
+            {/* =========================================================
+                1. COLOR BOXES DE REFERENCIA DE FIGMA (OPACIDAD 0.30) - zIndex: 1
+                ========================================================= */}
+            <View style={styles.colorBoxesLayer} pointerEvents="none">
+              {/* BOX 1: ROJO (Top 15% - 0 a 131.10px) */}
+              <View style={styles.colorBox1}>
+                <View style={styles.colorBoxContent}>
+                  <Text style={styles.boxTag}>TOP 15% (131.1px)</Text>
+                  <Text style={styles.boxDescription}>ESPEJO // VIGILANCIA // CCTV</Text>
+                </View>
               </View>
-              <View style={styles.keyboardBox}>
-                <Text style={styles.toolLabel}>TECLADO MEC.</Text>
+
+              {/* BOX 2: DORADO (Top 25% - 131 a 349.50px) */}
+              <View style={styles.colorBox2}>
+                <View style={styles.colorBoxContent}>
+                  <Text style={styles.boxTag}>TOP 25% (218.5px)</Text>
+                  <Text style={styles.boxDescription}>VENTANILLA // CLIENTE [DÍA {currentDay}]</Text>
+                </View>
+              </View>
+
+              {/* LÍNEA DIVISORIA ROJA (Y = 349.5px) */}
+              <View style={styles.redDividerLine} />
+
+              {/* BOX 3: CYAN (Bottom 35% - 349 a 655px) */}
+              <View style={styles.colorBox3}>
+                <View style={styles.colorBoxContent}>
+                  <Text style={styles.boxTag}>BOTTOM 35% (305.9px)</Text>
+                  <Text style={styles.boxDescription}>MESA PRINCIPAL // CARRUSEL</Text>
+                </View>
+              </View>
+
+              {/* BOX 4: AZUL MARINO (Bottom 25% - 655 a 873.5px) */}
+              <View style={styles.colorBox4}>
+                <View style={styles.colorBoxContent}>
+                  <Text style={styles.boxTag}>BOTTOM 25% (218.5px)</Text>
+                  <Text style={styles.boxDescription}>CAJONES // INVENTARIO</Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Bottom25Zone (flex: 25/60): Fila Inferior (Cajones e Inventario) */}
-          <View style={styles.bottom25Zone}>
-            {/* Cajones de Guardado (flex: 0.75 a la izquierda) */}
-            <View style={styles.drawerStorageBox}>
-              <Text style={styles.drawerTitle}>CAJONES DE GUARDADO (C.S.T.)</Text>
-              <Text style={styles.drawerHint}>[ NIDO DEL CUADERNO MASIVO / ARCHIVOS ]</Text>
-            </View>
+            {/* =========================================================
+                2. CLIENTE EN VENTANILLA (CUSTOMER AREA) - zIndex: 2
+                - Se transparenta al mantener presionado el Top 25%
+                ========================================================= */}
+            <CustomerArea inspectOpacity={inspectOpacity} />
 
-            {/* Inventario (flex: 0.25 a la derecha) */}
-            <View style={styles.inventoryBox}>
-              <Text style={styles.inventoryTitle}>INVENTARIO</Text>
-              <Text style={styles.inventoryCount}>[ 3 SLOTS ]</Text>
-            </View>
-          </View>
+            {/* =========================================================
+                3. REJA DE PROTECCIÓN (PROTECTION GRILLE) - zIndex: 4
+                - Se transparenta al mantener presionado el Top 25%
+                ========================================================= */}
+            <ProtectionGrille opacity={inspectOpacity} />
+
+            {/* =========================================================
+                ZONA TÁCTIL DE INSPECCIÓN: TOP 25% (Y: 131.1px a 349.5px)
+                - Mantener presionado: zoom global + fade de rejas y cliente
+                - Desplazar: paneo horizontal
+                - Soltar: vuelve suavemente a la normalidad
+                - Bloqueado si persiana cerrada o arma desenfundada
+                ========================================================= */}
+            <View
+              style={styles.top25TouchZone}
+              {...inspectPanResponder.panHandlers}
+            />
+
+            {/* =========================================================
+                4. CAJA DE INVENTARIO (INVENTORY BOX) - zIndex: 5
+                - Bloqueada físicamente SOLO si hay cajones abiertos.
+                ========================================================= */}
+            <InventoryBox
+              isBlocked={areDrawersOpen}
+              disabled={isGunDrawn}
+              onInventoryStateChange={setIsInventoryOpen}
+            />
+
+            {/* =========================================================
+                5. ZONA INFERIOR DE LA MESA Y CAJONES (zIndex: 6, 7, 8)
+                - Inhabilitada si la caja de inventario está desplegada.
+                - Al sacar el arma, el cajón derecho sigue activo para hold (guardar).
+                ========================================================= */}
+            <DeskDrawers
+              onToggleNotebook={toggleNotebook}
+              onToggleGun={toggleGun}
+              isGunDrawn={isGunDrawn}
+              disabled={isInventoryOpen}
+              onDrawersStateChange={setAreDrawersOpen}
+            />
+
+            {/* =========================================================
+                6. SUPERFICIE DE LA MESA (DESK WORKSTATION) - zIndex: 10
+                ========================================================= */}
+            <DeskWorkstation />
+
+            {/* =========================================================
+                7. PERSIANA ENROLLABLE (ROLL-UP DOOR) - zIndex: 25
+                ========================================================= */}
+            <RollUpDoor
+              disabled={isGunDrawn}
+              onDoorStateChange={setIsDoorClosed}
+            />
+
+            {/* =========================================================
+                8. ESTACIÓN PC (pc_station.webp) - zIndex: 40
+                - Hijo directo del stage para respetar el stacking context nativo.
+                ========================================================= */}
+            <PcAndFaxStation disabled={isGunDrawn} />
+
+            {/* =========================================================
+                9. ESTADO DEL ARMA EN MANO (missing_texture.webp + [ SHOOT ])
+                ========================================================= */}
+            {isGunDrawn && (
+              <>
+                {/* Sprite provisional del arma en mano (reposo en mesa) */}
+                <Image
+                  source={require('../assets/sprites/missing_texture.webp')}
+                  style={styles.gunSprite}
+                  resizeMode="contain"
+                />
+
+                {/* Botón [ SHOOT ] en la zona Top 25% */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.shootButton}
+                  onPress={() => {
+                    // Por el momento no hace nada
+                  }}
+                >
+                  <Text style={styles.shootButtonText}>[ SHOOT ]</Text>
+                  <Text style={styles.shootSubText}>OBJETIVO: CLIENTE EN VENTANILLA</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* =========================================================
+                10. CUADERNO (APARECE/DESAPARECE CON HOLD EN CAJÓN 1) - zIndex: 48
+                ========================================================= */}
+            {isNotebookVisible && (
+              <View pointerEvents={isGunDrawn ? 'none' : 'box-none'} style={StyleSheet.absoluteFill}>
+                <DraggableNotebook />
+              </View>
+            )}
+
+            {/* =========================================================
+                11. CAJA REGISTRADORA (CASH REGISTER OVERLAY) - zIndex: 60
+                ========================================================= */}
+            <CashRegisterOverlay disabled={isGunDrawn || isInventoryOpen} />
+
+            {/* =========================================================
+                12. FILTRO DE COLOR EN TODA LA PANTALLA MÓVIL (#34495E)
+                - Cubre toda la pantalla móvil sin bloquear gestos (pointerEvents="none")
+                ========================================================= */}
+            {ENABLE_SCREEN_FILTER && (
+              <View style={styles.screenFilterOverlay} pointerEvents="none" />
+            )}
+          </Animated.View>
         </View>
-
-        {/* =========================================================
-            4. CAPAS FLOTANTES & MECÁNICAS DIEGÉTICAS
-            ========================================================= */}
-        <PcAndFaxStation />
-        <DraggableNotebook />
-        <CashRegisterOverlay />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  fullScreen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#000000',
   },
-  rootContainer: {
+  screenWrapper: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#050505',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  stageContainer: {
+    height: '100%',
+    aspectRatio: 412 / 873.5,
+    backgroundColor: '#0a0a0c',
     position: 'relative',
+    overflow: 'hidden',
   },
 
-  // =========================================================
-  // TOP_ZONE (flex: 0.4)
-  // =========================================================
-  topZone: {
-    flex: 0.4,
-    backgroundColor: colors.surfaceDark,
-  },
-  top15Zone: {
-    flex: 15 / 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: scale(8),
-    paddingTop: verticalScale(4),
-  },
-  mirrorBox: {
-    width: scale(90),
-    height: '90%',
-    backgroundColor: colors.colorbox.mirrorConvex,
-    borderWidth: 2,
-    borderColor: '#f59e0b',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(2),
-  },
-  topCenterEmpty: {
-    flex: 1,
-    height: '90%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerDrafterText: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    color: colors.textSubtle,
-    fontSize: moderateScale(9),
-    letterSpacing: 1,
-  },
-  cctvClockBox: {
-    width: scale(95),
-    height: '90%',
-    backgroundColor: colors.colorbox.cctvClock,
-    borderWidth: 2,
-    borderColor: '#38bdf8',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(2),
-  },
-  cctvLabel: {
-    fontFamily: TYPOGRAPHY.digitalMain,
-    color: '#e0f2fe',
-    fontSize: moderateScale(7),
-    fontWeight: 'bold',
-  },
-  clockText: {
-    fontFamily: TYPOGRAPHY.digitalSecondary,
-    color: '#ffffff',
-    fontSize: moderateScale(10),
-    fontWeight: 'bold',
-  },
-  cctvStatus: {
-    fontFamily: TYPOGRAPHY.digitalMain,
-    color: colors.crtGreen,
-    fontSize: moderateScale(6),
-  },
-  top25Zone: {
-    flex: 25 / 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: scale(10),
-    paddingBottom: verticalScale(4),
-  },
-  clientSpriteBox: {
-    width: '75%',
-    height: '90%',
-    backgroundColor: colors.colorbox.clientArea,
-    borderWidth: 2,
-    borderColor: '#475569',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-  },
-  clientLabel: {
-    fontFamily: TYPOGRAPHY.stamps,
-    color: '#f8fafc',
-    fontSize: moderateScale(10),
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  clientStatus: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    color: '#94a3b8',
-    fontSize: moderateScale(8),
-    marginTop: verticalScale(4),
+  cameraContainer: {
+    ...StyleSheet.absoluteFill,
   },
 
-  // =========================================================
-  // LÍNEA ROJA DIVISORIA
-  // =========================================================
+  colorBoxesLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 1,
+    display: 'none', // DESHABILITADO — reactivar quitando esta línea
+  },
+
+  colorBox1: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(0),
+    height: figmaH(131.1),
+    backgroundColor: 'rgba(213.32, 4.92, 4.92, 0.30)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(213.32, 4.92, 4.92, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  colorBox2: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(131),
+    height: figmaH(218.5),
+    backgroundColor: 'rgba(182.91, 147.27, 49.25, 0.30)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   redDividerLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(349),
     height: 4,
     backgroundColor: colors.colorbox.dividerLine,
-    width: '100%',
-    zIndex: 10,
+    zIndex: 12,
   },
 
-  // =========================================================
-  // BOTTOM_ZONE (flex: 0.6)
-  // =========================================================
-  bottomZone: {
-    flex: 0.6,
-    backgroundColor: colors.background,
-  },
-  bottom35Zone: {
-    flex: 35 / 60,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: scale(6),
-    gap: scale(6),
-  },
-  docCarouselBox: {
-    flex: 1,
-    backgroundColor: colors.colorbox.docCarousel,
-    borderWidth: 2,
-    borderColor: '#b45309',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(6),
-  },
-  docCarouselTitle: {
-    fontFamily: TYPOGRAPHY.dirtyDoc,
-    color: '#fef3c7',
-    fontSize: moderateScale(9),
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  docCarouselSub: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    color: '#fde68a',
-    fontSize: moderateScale(7),
-    textAlign: 'center',
-    marginTop: verticalScale(4),
-  },
-  toolsRack: {
-    width: scale(75),
-    justifyContent: 'space-between',
-    gap: verticalScale(4),
-  },
-  uvLampBox: {
-    flex: 1,
-    backgroundColor: colors.colorbox.uvLamp,
-    borderWidth: 2,
-    borderColor: '#a855f7',
-    borderRadius: 4,
+  colorBox3: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(349),
+    height: figmaH(305.9),
+    backgroundColor: 'rgba(51.08, 173.21, 181.93, 0.30)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  keyboardBox: {
-    flex: 1,
-    backgroundColor: colors.colorbox.keyboard,
-    borderWidth: 2,
-    borderColor: '#6b7280',
-    borderRadius: 4,
+
+  colorBox4: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(655),
+    height: figmaH(218.5),
+    backgroundColor: 'rgba(2.04, 12.73, 66.20, 0.30)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(2.04, 12.73, 66.20, 0.80)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  toolLabel: {
+
+  colorBoxContent: {
+    alignItems: 'center',
+    paddingHorizontal: scale(8),
+  },
+  boxTag: {
     fontFamily: TYPOGRAPHY.systemPC,
     color: '#ffffff',
-    fontSize: moderateScale(7),
+    fontSize: moderateScale(9),
     fontWeight: 'bold',
-    textAlign: 'center',
-  },
-
-  // Bottom25Zone: Fila Inferior
-  bottom25Zone: {
-    flex: 25 / 60,
-    flexDirection: 'row',
+    letterSpacing: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     paddingHorizontal: scale(6),
-    paddingBottom: verticalScale(6),
-    gap: scale(6),
+    paddingVertical: verticalScale(2),
+    borderRadius: 3,
   },
-  drawerStorageBox: {
-    flex: 0.75,
-    backgroundColor: colors.colorbox.drawerStorage,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(6),
-  },
-  drawerTitle: {
-    fontFamily: TYPOGRAPHY.stamps,
-    color: '#dbeafe',
-    fontSize: moderateScale(9),
-    fontWeight: 'bold',
-  },
-  drawerHint: {
+  boxDescription: {
     fontFamily: TYPOGRAPHY.cleanDoc,
-    color: '#93c5fd',
+    color: '#e2e8f0',
     fontSize: moderateScale(7),
     marginTop: verticalScale(2),
+    textAlign: 'center',
   },
-  inventoryBox: {
-    flex: 0.25,
-    backgroundColor: colors.colorbox.inventory,
+
+  // Zona táctil para inspección Top 25%
+  top25TouchZone: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: figmaY(131.1),
+    height: figmaH(218.5),
+    zIndex: 20, // Entre la reja (4) y la persiana (25)
+  },
+
+  // Sprite provisional del arma en mano (reposo sobre cajón derecho)
+  gunSprite: {
+    position: 'absolute',
+    left: figmaX(460),
+    top: figmaY(550),
+    width: figmaW(140),
+    height: figmaH(140),
+    zIndex: 45,
+    pointerEvents: 'none',
+  },
+
+  // Botón [ SHOOT ] en zona Top 25%
+  shootButton: {
+    position: 'absolute',
+    top: figmaY(215),
+    alignSelf: 'center',
+    backgroundColor: '#991b1b',
     borderWidth: 2,
-    borderColor: '#10b981',
+    borderColor: '#f87171',
     borderRadius: 6,
-    justifyContent: 'center',
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(10),
     alignItems: 'center',
-    padding: scale(4),
+    zIndex: 50,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
   },
-  inventoryTitle: {
+  shootButtonText: {
     fontFamily: TYPOGRAPHY.stamps,
-    color: '#d1fae5',
-    fontSize: moderateScale(8),
+    color: '#ffffff',
+    fontSize: moderateScale(14),
     fontWeight: 'bold',
+    letterSpacing: 2,
   },
-  inventoryCount: {
-    fontFamily: TYPOGRAPHY.digitalMain,
-    color: '#a7f3d0',
+  shootSubText: {
+    fontFamily: TYPOGRAPHY.systemPC,
+    color: '#fecaca',
     fontSize: moderateScale(7),
     marginTop: verticalScale(2),
   },
 
-  // Etiquetas genéricas
-  boxLabel: {
-    fontFamily: TYPOGRAPHY.stamps,
-    color: '#ffffff',
-    fontSize: moderateScale(8),
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  subLabel: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    color: '#fef3c7',
-    fontSize: moderateScale(6),
-    textAlign: 'center',
-    marginTop: 1,
+  // Filtro de pantalla completa (#34495E con opacidad al 53%)
+  screenFilterOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: SCREEN_FILTER_COLOR,
+    zIndex: 70, // Por encima de toda la escena y elementos móviles sin bloquear toques
   },
 });
