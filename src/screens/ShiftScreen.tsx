@@ -1,543 +1,398 @@
-import React, { useState, useRef, useEffect } from 'react';
+/**
+ * =========================================================================
+ * src/screens/ShiftScreen.tsx
+ * =========================================================================
+ * RESPONSABILIDAD ÚNICA: Orquestar y renderizar la escena del turno.
+ *
+ * NO contiene:
+ *   ✗ Coordenadas de Figma          → sceneConfig.ts
+ *   ✗ Lógica de negocio del juego   → useTurnEngine.ts
+ *   ✗ Animaciones de cámara/lámpara → useSceneCamera.ts
+ *   ✗ Estado de cajones/carrusel    → useDrawers.ts
+ *   ✗ Estado de overlays            → useOverlays.ts
+ *
+ * SÍ contiene:
+ *   ✓ Composición de los 4 hooks
+ *   ✓ Roll-Up Door PanResponder (único pannable que no tiene hook propio)
+ *   ✓ JSX de render: <GameSprite>, <TouchableOpacity>, overlays
+ * =========================================================================
+ */
+
+import React, { useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  StatusBar,
-  TouchableOpacity,
-  Image,
-  Animated,
-  PanResponder,
-  Easing,
+  View, Text, Image, TouchableOpacity, StyleSheet,
+  StatusBar, Animated, PanResponder, useWindowDimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../models/types';
-import { colors } from '../theme/colors';
 import { TYPOGRAPHY } from '../theme/typography';
+import { GameSprite } from '../components/scene/GameSprite';
 import {
-  figmaX,
-  figmaY,
-  figmaW,
-  figmaH,
-  moderateScale,
-  scale,
-  verticalScale,
-} from '../utils/responsive';
-
-// Componentes diegéticos
-import { GameBackground } from '../components/shift/GameBackground';
-import { CustomerArea } from '../components/shift/CustomerArea';
-import { ProtectionGrille } from '../components/shift/ProtectionGrille';
-import { RollUpDoor } from '../components/shift/RollUpDoor';
-import { DeskWorkstation } from '../components/shift/DeskWorkstation';
-import { DeskDrawers } from '../components/shift/DeskDrawers';
-import { InventoryBox } from '../components/shift/InventoryBox';
-import { PcAndFaxStation } from '../components/shift/PcAndFaxStation';
-import { DraggableNotebook } from '../components/shift/DraggableNotebook';
-import { CashRegisterOverlay } from '../components/shift/CashRegisterOverlay';
+  ADAPTED_ELEMENTS, ISceneElement, SPRITE_ASSETS,
+  FORCE_COLOR_BOXES, SHOW_REFERENCE_COLOR_BOXES, ENABLE_SCREEN_FILTER,
+  SCREEN_FILTER_COLOR, COLOR_ZONES, TABLE_CAROUSEL_ITEMS,
+  FIGMA_OFFSET_X, FIGMA_OFFSET_Y,
+} from '../config/sceneConfig';
+import { useTurnEngine }  from '../hooks/useTurnEngine';
+import { useSceneCamera } from '../hooks/useSceneCamera';
+import { useDrawers }     from '../hooks/useDrawers';
+import { useOverlays }    from '../hooks/useOverlays';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GameInterface' | 'Shift'>;
 
-/**
- * =========================================================================
- * SHIFTSCREEN (LIENZO MATEMÁTICO FIGMA 412 x 873.5 - MODO INMERSIVO)
- * =========================================================================
- * - Bloqueo vertical 100% y centrado horizontal en tablets.
- * - Recorte estricto (overflow: 'hidden') en el ancho de los Color Boxes (412px base).
- * - Componentes integrados y apilamiento estricto:
- *   1. Fondo de la Habitación (game_background.webp, zIndex: 0).
- *   2. Color Boxes de Referencia (15%, 25%, 35%, 25% con opacidad 0.30, zIndex: 1).
- *   3. Cliente en Ventanilla (character_client_1.webp, zIndex: 2).
- *   4. Reja de Protección (protection_grille.webp, zIndex: 4).
- *   5. Caja de Inventario (inventory_box.webp, zIndex: 5, inferior a la mesa).
- *   6. Cajones Inferiores (desk_under_workstation zIndex: 6, cajones zIndex: 7, 8).
- *   7. Plataforma de la Mesa (desk_workstation.webp, zIndex: 10).
- *   8. Línea divisoria roja (Y = 349.5px, zIndex: 12).
- *   9. Persiana Enrollable (roll-up door con cabezal estático y física, zIndex: 25).
- *  10. PC Station con Modal (pc_station.webp, zIndex: 40).
- *  11. Cuaderno Compacto (aparece/desaparece con Hold en Cajón Izquierdo, zIndex: 48).
- *  12. Caja Registradora (CashRegisterOverlay calibrada al fondo, zIndex: 60).
- */
-// =========================================================================
-// FILTRO DIEGÉTICO / ATMOSFÉRICO DE PANTALLA COMPLETA (#34495E)
-// =========================================================================
-// Cambiar a false para desactivar el filtro de la pantalla móvil:
-const ENABLE_SCREEN_FILTER = true;
-// Color #34495E con opacidad al 53% (rango solicitado 50% - 56%):
-const SCREEN_FILTER_COLOR = 'rgba(52, 73, 94, 0.53)';
+// ── Helpers de módulo ─────────────────────────────────────────────────────────
+/** Busca un elemento por ID (llamado una vez al montar, no en cada render) */
+const el = (id: string): ISceneElement => ADAPTED_ELEMENTS.find(e => e.id === id)!;
 
+// =========================================================================
+// SUB-COMPONENTE: Flechas de carrusel (solo visual, sin estado)
+// =========================================================================
+interface CarouselArrowsProps {
+  onPrev: () => void; onNext: () => void;
+  canPrev: boolean;   canNext: boolean;
+  anchorLeft: number; anchorTop: number; anchorWidth: number;
+}
+const CarouselArrows: React.FC<CarouselArrowsProps> = ({
+  onPrev, onNext, canPrev, canNext, anchorLeft, anchorTop, anchorWidth,
+}) => (
+  <>
+    <TouchableOpacity onPress={onPrev} disabled={!canPrev} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+      style={[styles.carouselArrow, { left: anchorLeft - 30, top: anchorTop - 18, opacity: canPrev ? 1 : 0.3 }]}>
+      <Text style={styles.carouselArrowText}>❮</Text>
+    </TouchableOpacity>
+    <TouchableOpacity onPress={onNext} disabled={!canNext} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+      style={[styles.carouselArrow, { left: anchorLeft + anchorWidth + 4, top: anchorTop - 18, opacity: canNext ? 1 : 0.3 }]}>
+      <Text style={styles.carouselArrowText}>❯</Text>
+    </TouchableOpacity>
+  </>
+);
+
+// =========================================================================
+// PANTALLA PRINCIPAL
+// =========================================================================
 export const ShiftScreen: React.FC<Props> = ({ route }) => {
   const currentDay = route.params && 'currentDay' in route.params ? route.params.currentDay : 1;
 
-  // Estados de interacción
-  const [isNotebookVisible, setIsNotebookVisible] = useState(false);
-  const [isGunDrawn, setIsGunDrawn] = useState(false);
-  const [areDrawersOpen, setAreDrawersOpen] = useState(false);
-  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
-  const [isDoorClosed, setIsDoorClosed] = useState(false);
+  // ── Escala global ─────────────────────────────────────────────────────────
+  const { height: windowHeight } = useWindowDimensions();
+  const scale      = windowHeight / 1456;
+  const stageWidth = Math.round(646 * scale);
 
-  const isDoorClosedRef = useRef(false);
-  useEffect(() => { isDoorClosedRef.current = isDoorClosed; }, [isDoorClosed]);
+  /** Convierte px Figma relativos al offset → px pantalla */
+  const px = (figmaPx: number) => Math.round(figmaPx * scale);
+  /** Devuelve estilo absoluto de posición a partir de un ISceneElement */
+  const pos = (e: ISceneElement) => ({
+    left:   px(e.figmaLeft - FIGMA_OFFSET_X),
+    top:    px(e.figmaTop  - FIGMA_OFFSET_Y),
+    width:  px(e.figmaWidth),
+    height: px(e.figmaHeight),
+  });
 
-  const isGunDrawnRef = useRef(false);
-  useEffect(() => { isGunDrawnRef.current = isGunDrawn; }, [isGunDrawn]);
+  // ── Hooks (orden: overlays primero porque provee isBlocked) ──────────────
+  const engine   = useTurnEngine(currentDay);
+  const overlays = useOverlays(scale, windowHeight);
+  const drawers  = useDrawers(scale, overlays.isBlocked);
+  const camera   = useSceneCamera(scale, overlays.isBlocked, drawers.carouselFocused);
 
-  // Animaciones de cámara para Inspección Top 25% (Opción B: Zoom global)
-  const zoomScale = useRef(new Animated.Value(1)).current;
-  const cameraTranslateY = useRef(new Animated.Value(0)).current;
-  const cameraPanX = useRef(new Animated.Value(0)).current;
-  const inspectOpacity = useRef(new Animated.Value(1)).current;
-  const isInspecting = useRef(false);
+  // ── Roll-Up Door: PanResponder (lee panConfig de sceneConfig) ─────────────
+  const rollEl    = el('roll-up-door');
+  const ROLL_MAX  = px(rollEl.panConfig?.maxTranslateY ?? 478);
+  const rollSnaps = (rollEl.panConfig?.snapPositions ?? [0, 478]).map(px);
+  const rollDoorY = useRef(new Animated.Value(0)).current;
+  const rollOff   = useRef(0);
 
-  const MAX_PAN_X = figmaW(160);
+  const rollDoorPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => !overlays.isBlocked,
+    onMoveShouldSetPanResponder:  (_, g) => !overlays.isBlocked && Math.abs(g.dy) > 5,
+    onPanResponderGrant:  () => rollDoorY.stopAnimation(v => { rollOff.current = v; }),
+    onPanResponderMove:   (_, g) => {
+      rollDoorY.setValue(Math.min(Math.max(rollOff.current + g.dy, 0), ROLL_MAX));
+    },
+    onPanResponderRelease: (_, g) => {
+      const cur  = rollOff.current + g.dy;
+      const snap = cur > ROLL_MAX / 2 ? rollSnaps[1] : rollSnaps[0];
+      rollOff.current = snap;
+      Animated.spring(rollDoorY, { toValue: snap, friction: 10, tension: 40, useNativeDriver: true }).start();
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    },
+  })).current;
 
-  const startInspection = () => {
-    isInspecting.current = true;
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
-    Animated.parallel([
-      Animated.spring(zoomScale, {
-        toValue: 1.7,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.spring(cameraTranslateY, {
-        toValue: figmaY(185),
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(inspectOpacity, {
-        toValue: 0.18,
-        duration: 250,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const endInspection = () => {
-    if (!isInspecting.current) return;
-    isInspecting.current = false;
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-    Animated.parallel([
-      Animated.spring(zoomScale, {
-        toValue: 1,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-      Animated.spring(cameraTranslateY, {
-        toValue: 0,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-      Animated.spring(cameraPanX, {
-        toValue: 0,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(inspectOpacity, {
-        toValue: 1,
-        duration: 250,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const inspectPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () =>
-        !isDoorClosedRef.current && !isGunDrawnRef.current,
-      onMoveShouldSetPanResponder: () =>
-        isInspecting.current && !isDoorClosedRef.current && !isGunDrawnRef.current,
-
-      onPanResponderGrant: () => {
-        startInspection();
-      },
-
-      onPanResponderMove: (_, gestureState) => {
-        if (!isInspecting.current) return;
-        const targetX = gestureState.dx;
-        const clampedX = Math.min(Math.max(targetX, -MAX_PAN_X), MAX_PAN_X);
-        cameraPanX.setValue(clampedX);
-      },
-
-      onPanResponderRelease: () => {
-        endInspection();
-      },
-      onPanResponderTerminate: () => {
-        endInspection();
-      },
-    })
-  ).current;
-
-  const toggleNotebook = () => {
-    setIsNotebookVisible((prev) => !prev);
-  };
-
-  const toggleGun = () => {
-    setIsGunDrawn((prev) => !prev);
-  };
-
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.fullScreen}>
-      <StatusBar hidden={true} />
-
+      <StatusBar hidden />
       <View style={styles.screenWrapper}>
-        <View style={styles.stageContainer}>
-          {/* =========================================================
-              CÁMARA GLOBAL DE ESCENARIO (ZOOM + PANEO DE INSPECCIÓN)
-              ========================================================= */}
-          <Animated.View
-            style={[
-              styles.cameraContainer,
-              {
-                transform: [
-                  { scale: zoomScale },
-                  { translateX: cameraPanX },
-                  { translateY: cameraTranslateY },
-                ],
-              },
-            ]}
-          >
-            {/* =========================================================
-                0. FONDO DE LA HABITACIÓN / ESCENARIO - zIndex: 0
-                ========================================================= */}
-            <GameBackground />
+        <View style={[styles.stage, { width: stageWidth, height: windowHeight }]} collapsable={false}>
 
-            {/* =========================================================
-                1. COLOR BOXES DE REFERENCIA DE FIGMA (OPACIDAD 0.30) - zIndex: 1
-                ========================================================= */}
-            <View style={styles.colorBoxesLayer} pointerEvents="none">
-              {/* BOX 1: ROJO (Top 15% - 0 a 131.10px) */}
-              <View style={styles.colorBox1}>
-                <View style={styles.colorBoxContent}>
-                  <Text style={styles.boxTag}>TOP 15% (131.1px)</Text>
-                  <Text style={styles.boxDescription}>ESPEJO // VIGILANCIA // CCTV</Text>
-                </View>
-              </View>
+          {/* ================================================================
+              CÁMARA GLOBAL: zoom + paneo
+              ================================================================ */}
+          <Animated.View style={[styles.camera, { transform: camera.cameraTransform }]}>
 
-              {/* BOX 2: DORADO (Top 25% - 131 a 349.50px) */}
-              <View style={styles.colorBox2}>
-                <View style={styles.colorBoxContent}>
-                  <Text style={styles.boxTag}>TOP 25% (218.5px)</Text>
-                  <Text style={styles.boxDescription}>VENTANILLA // CLIENTE [DÍA {currentDay}]</Text>
-                </View>
-              </View>
+            {/* Sprites estáticos y sombras — sin interacción */}
+            {ADAPTED_ELEMENTS
+              .filter(e => e.behavior === 'static' || e.behavior === 'shadow')
+              .map(e => (
+                <GameSprite key={e.id} element={e} scale={scale}
+                  inspectOpacity={e.hasInspectOpacity ? camera.inspectOpacity : undefined}
+                />
+              ))}
 
-              {/* LÍNEA DIVISORIA ROJA (Y = 349.5px) */}
-              <View style={styles.redDividerLine} />
+            {/* Roll-Up Door — arrastrable verticalmente */}
+            <Animated.View
+              {...rollDoorPan.panHandlers}
+              style={[{ position: 'absolute', ...pos(rollEl), zIndex: rollEl.zIndex },
+                      { transform: [{ translateY: rollDoorY }] }]}
+            >
+              {SPRITE_ASSETS['roll-up-door'] && !FORCE_COLOR_BOXES
+                ? <Image source={SPRITE_ASSETS['roll-up-door']} style={styles.fill} resizeMode="stretch" />
+                : <View style={[styles.fallback, { backgroundColor: rollEl.fallbackColor }]}><Text style={styles.fbLabel}>PERSIANA</Text></View>}
+            </Animated.View>
 
-              {/* BOX 3: CYAN (Bottom 35% - 349 a 655px) */}
-              <View style={styles.colorBox3}>
-                <View style={styles.colorBoxContent}>
-                  <Text style={styles.boxTag}>BOTTOM 35% (305.9px)</Text>
-                  <Text style={styles.boxDescription}>MESA PRINCIPAL // CARRUSEL</Text>
-                </View>
-              </View>
+            {/* Lámpara Cabeza — arrastrable libremente */}
+            <Animated.View
+              {...camera.lampPanResponder.panHandlers}
+              style={[{ position: 'absolute', ...pos(el('lampara-cabeza')), zIndex: el('lampara-cabeza').zIndex },
+                      { transform: [{ translateX: camera.lampX }, { translateY: camera.lampY }] }]}
+            >
+              {SPRITE_ASSETS['lampara-cabeza'] && !FORCE_COLOR_BOXES
+                ? <Image source={SPRITE_ASSETS['lampara-cabeza']} style={styles.fill} resizeMode="stretch" />
+                : <View style={[styles.fallback, { backgroundColor: el('lampara-cabeza').fallbackColor }]}><Text style={styles.fbLabel}>LÁMPARA</Text></View>}
+            </Animated.View>
 
-              {/* BOX 4: AZUL MARINO (Bottom 25% - 655 a 873.5px) */}
-              <View style={styles.colorBox4}>
-                <View style={styles.colorBoxContent}>
-                  <Text style={styles.boxTag}>BOTTOM 25% (218.5px)</Text>
-                  <Text style={styles.boxDescription}>CAJONES // INVENTARIO</Text>
-                </View>
-              </View>
-            </View>
+            {/* PC — tap abre monitor */}
+            {(() => { const e = el('pc'); return (
+              <TouchableOpacity key="pc" onPress={overlays.openMonitor}
+                disabled={overlays.isBlocked} activeOpacity={0.85}
+                style={{ position: 'absolute', ...pos(e), zIndex: e.zIndex }}
+              >
+                {SPRITE_ASSETS['pc'] && !FORCE_COLOR_BOXES
+                  ? <Image source={SPRITE_ASSETS['pc']} style={styles.fill} resizeMode="stretch" />
+                  : <View style={[styles.fallback, { backgroundColor: e.fallbackColor }]}><Text style={styles.fbLabel}>PC</Text></View>}
+              </TouchableOpacity>
+            ); })()}
 
-            {/* =========================================================
-                2. CLIENTE EN VENTANILLA (CUSTOMER AREA) - zIndex: 2
-                - Se transparenta al mantener presionado el Top 25%
-                ========================================================= */}
-            <CustomerArea inspectOpacity={inspectOpacity} />
+            {/* Caja Cartón — tap abre submenu */}
+            {(() => { const e = el('caja-carton'); return (
+              <TouchableOpacity key="caja-carton" onPress={() => drawers.setCajaCartonOpen(v => !v)}
+                disabled={overlays.isBlocked} activeOpacity={0.9}
+                style={{ position: 'absolute', ...pos(e), zIndex: e.zIndex }}
+              >
+                {SPRITE_ASSETS['caja-carton'] && !FORCE_COLOR_BOXES
+                  ? <Image source={SPRITE_ASSETS['caja-carton']} style={styles.fill} resizeMode="stretch" />
+                  : <View style={[styles.fallback, { backgroundColor: e.fallbackColor }]}><Text style={styles.fbLabel}>CAJA CARTÓN {drawers.cajaCartonOpen ? '▲' : ''}</Text></View>}
+              </TouchableOpacity>
+            ); })()}
 
-            {/* =========================================================
-                3. REJA DE PROTECCIÓN (PROTECTION GRILLE) - zIndex: 4
-                - Se transparenta al mantener presionado el Top 25%
-                ========================================================= */}
-            <ProtectionGrille opacity={inspectOpacity} />
+            {/* Cajones — estado + animación desde useDrawers */}
+            {drawers.drawerIds.map(id => {
+              const e      = el(id);
+              const drawer = drawers.getDrawer(id);
+              if (!drawer) return null;
+              return (
+                <Animated.View key={id}
+                  style={[{ position: 'absolute', ...pos(e), zIndex: drawer.isOpen ? e.zIndex + 10 : e.zIndex },
+                          { transform: [{ translateY: drawer.animValue }] }]}
+                >
+                  <TouchableOpacity onPress={() => drawers.toggleDrawer(id)}
+                    disabled={overlays.isBlocked} activeOpacity={0.85} style={StyleSheet.absoluteFill}>
+                    {SPRITE_ASSETS[id] && !FORCE_COLOR_BOXES
+                      ? <Image source={SPRITE_ASSETS[id]} style={styles.fill} resizeMode="stretch" />
+                      : <View style={[styles.fallback, { backgroundColor: e.fallbackColor }]}><Text style={styles.fbLabel}>{e.label} {drawer.isOpen ? '▲' : '▼'}</Text></View>}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
 
-            {/* =========================================================
-                ZONA TÁCTIL DE INSPECCIÓN: TOP 25% (Y: 131.1px a 349.5px)
-                - Mantener presionado: zoom global + fade de rejas y cliente
-                - Desplazar: paneo horizontal
-                - Soltar: vuelve suavemente a la normalidad
-                - Bloqueado si persiana cerrada o arma desenfundada
-                ========================================================= */}
-            <View
-              style={styles.top25TouchZone}
-              {...inspectPanResponder.panHandlers}
-            />
+            {/* Slots visuales + flechas de cajones abiertos */}
+            {drawers.drawerIds.map(id => {
+              const drawer = drawers.getDrawer(id);
+              if (!drawer?.isOpen) return null;
+              const slotEl     = el(drawer.carouselSlotId);
+              const slotPos    = pos(slotEl);
+              const activeSprite = SPRITE_ASSETS[drawer.items[drawer.activeItemIdx]];
+              return (
+                <React.Fragment key={`open-${id}`}>
+                  <View pointerEvents="none"
+                    style={{ position: 'absolute', ...slotPos, zIndex: 45 }}>
+                    {activeSprite && !FORCE_COLOR_BOXES
+                      ? <Image source={activeSprite} style={styles.fill} resizeMode="contain" />
+                      : <View style={[styles.fallback, { backgroundColor: 'rgba(185,28,28,0.7)' }]}><Text style={styles.fbLabel}>{drawer.items[drawer.activeItemIdx]}</Text></View>}
+                  </View>
+                  <CarouselArrows
+                    onPrev={() => drawers.prevItem(id)} onNext={() => drawers.nextItem(id)}
+                    canPrev={drawer.activeItemIdx > 0} canNext={drawer.activeItemIdx < drawer.items.length - 1}
+                    anchorLeft={slotPos.left} anchorTop={slotPos.top + slotPos.height} anchorWidth={slotPos.width}
+                  />
+                </React.Fragment>
+              );
+            })}
 
-            {/* =========================================================
-                4. CAJA DE INVENTARIO (INVENTORY BOX) - zIndex: 5
-                - Bloqueada físicamente SOLO si hay cajones abiertos.
-                ========================================================= */}
-            <InventoryBox
-              isBlocked={areDrawersOpen}
-              disabled={isGunDrawn}
-              onInventoryStateChange={setIsInventoryOpen}
-            />
-
-            {/* =========================================================
-                5. ZONA INFERIOR DE LA MESA Y CAJONES (zIndex: 6, 7, 8)
-                - Inhabilitada si la caja de inventario está desplegada.
-                - Al sacar el arma, el cajón derecho sigue activo para hold (guardar).
-                ========================================================= */}
-            <DeskDrawers
-              onToggleNotebook={toggleNotebook}
-              onToggleGun={toggleGun}
-              isGunDrawn={isGunDrawn}
-              disabled={isInventoryOpen}
-              onDrawersStateChange={setAreDrawersOpen}
-            />
-
-            {/* =========================================================
-                6. SUPERFICIE DE LA MESA (DESK WORKSTATION) - zIndex: 10
-                ========================================================= */}
-            <DeskWorkstation />
-
-            {/* =========================================================
-                7. PERSIANA ENROLLABLE (ROLL-UP DOOR) - zIndex: 25
-                ========================================================= */}
-            <RollUpDoor
-              disabled={isGunDrawn}
-              onDoorStateChange={setIsDoorClosed}
-            />
-
-            {/* =========================================================
-                8. ESTACIÓN PC (pc_station.webp) - zIndex: 40
-                - Hijo directo del stage para respetar el stacking context nativo.
-                ========================================================= */}
-            <PcAndFaxStation disabled={isGunDrawn} />
-
-            {/* =========================================================
-                9. ESTADO DEL ARMA EN MANO (missing_texture.webp + [ SHOOT ])
-                ========================================================= */}
-            {isGunDrawn && (
+            {/* Carrusel Mesa — tap enfoca/desenfoca cámara */}
+            {(() => { const e = el('carrusel-mesa'); const ePos = pos(e); return (
               <>
-                {/* Sprite provisional del arma en mano (reposo en mesa) */}
-                <Image
-                  source={require('../assets/sprites/missing_texture.webp')}
-                  style={styles.gunSprite}
-                  resizeMode="contain"
+                <TouchableOpacity key="carrusel-mesa"
+                  onPress={drawers.carouselFocused
+                    ? () => { drawers.setCarouselFocused(false); camera.blurCarousel(); }
+                    : () => { drawers.setCarouselFocused(true);  camera.focusCarousel(); }}
+                  disabled={overlays.isBlocked} activeOpacity={0.9}
+                  style={{ position: 'absolute', ...ePos, zIndex: e.zIndex }}
+                >
+                  {SPRITE_ASSETS['carrusel-mesa'] && !FORCE_COLOR_BOXES
+                    ? <Image source={SPRITE_ASSETS['carrusel-mesa']} style={styles.fill} resizeMode="stretch" />
+                    : <View style={[styles.fallback, { backgroundColor: e.fallbackColor }]}><Text style={styles.fbLabel}>{TABLE_CAROUSEL_ITEMS[drawers.tableCarouselIdx]}</Text></View>}
+                </TouchableOpacity>
+
+                {/* Slot activo del carrusel de mesa */}
+                {(() => { const se = el('no-texture'); const activeSrc = SPRITE_ASSETS[TABLE_CAROUSEL_ITEMS[drawers.tableCarouselIdx]]; return (
+                  <View key="slot-mesa" pointerEvents="none"
+                    style={{ position: 'absolute', ...pos(se), zIndex: se.zIndex }}>
+                    {activeSrc && !FORCE_COLOR_BOXES
+                      ? <Image source={activeSrc} style={styles.fill} resizeMode="contain" />
+                      : <View style={[styles.fallback, { backgroundColor: se.fallbackColor }]}><Text style={styles.fbLabel}>{TABLE_CAROUSEL_ITEMS[drawers.tableCarouselIdx]}</Text></View>}
+                  </View>
+                ); })()}
+
+                {/* Flechas carrusel mesa */}
+                <CarouselArrows
+                  onPrev={() => drawers.setTableCarouselIdx(i => Math.max(0, i - 1))}
+                  onNext={() => drawers.setTableCarouselIdx(i => Math.min(TABLE_CAROUSEL_ITEMS.length - 1, i + 1))}
+                  canPrev={drawers.tableCarouselIdx > 0} canNext={drawers.tableCarouselIdx < TABLE_CAROUSEL_ITEMS.length - 1}
+                  anchorLeft={ePos.left} anchorTop={ePos.top + ePos.height} anchorWidth={ePos.width}
                 />
 
-                {/* Botón [ SHOOT ] en la zona Top 25% */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.shootButton}
-                  onPress={() => {
-                    // Por el momento no hace nada
-                  }}
-                >
-                  <Text style={styles.shootButtonText}>[ SHOOT ]</Text>
-                  <Text style={styles.shootSubText}>OBJETIVO: CLIENTE EN VENTANILLA</Text>
-                </TouchableOpacity>
+                {/* Botón COBRAR */}
+                {drawers.carouselFocused && !overlays.isBlocked && (
+                  <TouchableOpacity onPress={overlays.openCaja}
+                    style={[styles.payButton, { left: ePos.left + ePos.width - px(100), top: ePos.top + ePos.height + px(10), zIndex: 60 }]}>
+                    <Text style={styles.payButtonText}>[ COBRAR ]</Text>
+                  </TouchableOpacity>
+                )}
               </>
-            )}
+            ); })()}
 
-            {/* =========================================================
-                10. CUADERNO (APARECE/DESAPARECE CON HOLD EN CAJÓN 1) - zIndex: 48
-                ========================================================= */}
-            {isNotebookVisible && (
-              <View pointerEvents={isGunDrawn ? 'none' : 'box-none'} style={StyleSheet.absoluteFill}>
-                <DraggableNotebook />
-              </View>
-            )}
-
-            {/* =========================================================
-                11. CAJA REGISTRADORA (CASH REGISTER OVERLAY) - zIndex: 60
-                ========================================================= */}
-            <CashRegisterOverlay disabled={isGunDrawn || isInventoryOpen} />
-
-            {/* =========================================================
-                12. FILTRO DE COLOR EN TODA LA PANTALLA MÓVIL (#34495E)
-                - Cubre toda la pantalla móvil sin bloquear gestos (pointerEvents="none")
-                ========================================================= */}
-            {ENABLE_SCREEN_FILTER && (
-              <View style={styles.screenFilterOverlay} pointerEvents="none" />
-            )}
+            {/* Zona táctil invisible de inspección (Zona B) */}
+            <View style={[styles.inspectZone, { top: px(156), height: px(478), zIndex: 50 }]}
+              {...(!overlays.isBlocked && !drawers.carouselFocused ? camera.inspectPanResponder.panHandlers : {})}
+            />
           </Animated.View>
+
+          {/* ================================================================
+              OVERLAY: APUNTAR
+              ================================================================ */}
+          {overlays.isAiming && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 990 }]}>
+              <View pointerEvents="none"
+                style={{ position: 'absolute', ...overlays.positions.apuntar, zIndex: 999 }}>
+                {SPRITE_ASSETS['apuntar'] && !FORCE_COLOR_BOXES
+                  ? <Image source={SPRITE_ASSETS['apuntar']} style={styles.fill} resizeMode="stretch" />
+                  : <View style={[styles.fallback, { backgroundColor: 'rgba(239,68,68,0.40)' }]}><Text style={styles.fbLabel}>APUNTAR</Text></View>}
+              </View>
+              <View style={[styles.aimButtons, { zIndex: 1000 }]}>
+                <TouchableOpacity onPress={overlays.holster} style={styles.aimBtnSecondary}>
+                  <Text style={styles.aimBtnText}>[ GUARDAR ]</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { /* TODO: disparo */ overlays.holster(); }} style={styles.aimBtnDanger}>
+                  <Text style={styles.aimBtnText}>[ DISPARAR ]</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* OVERLAY DIM — oscurece la escena cuando monitor o caja están abiertos */}
+          {overlays.isAnyOverlayOpen && (
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: '#000',
+              opacity: overlays.overlayDimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.72] }),
+              zIndex: 700,
+            }]} />
+          )}
+
+          {/* ================================================================
+              OVERLAY: MONITOR PC
+              ================================================================ */}
+          {overlays.monitorOpen && (
+            <TouchableOpacity activeOpacity={1} onPress={overlays.closeMonitor}
+              style={[StyleSheet.absoluteFill, { zIndex: 750 }]}>
+              <Animated.View style={{ position: 'absolute', ...overlays.positions.monitor, zIndex: 800, transform: [{ scale: overlays.monitorScale }] }}>
+                {SPRITE_ASSETS['monitor-1'] && !FORCE_COLOR_BOXES
+                  ? <Image source={SPRITE_ASSETS['monitor-1']} style={styles.fill} resizeMode="stretch" />
+                  : <View style={[styles.overlayPanel, { width: overlays.positions.monitor.width, height: overlays.positions.monitor.height }]}>
+                      <Text style={styles.overlayTitle}>🖥  MONITOR PC</Text>
+                      <Text style={styles.fbDims}>Añade monitor-1.webp — Toca fuera para cerrar</Text>
+                    </View>}
+              </Animated.View>
+            </TouchableOpacity>
+          )}
+
+          {/* ================================================================
+              OVERLAY: CAJA REGISTRADORA
+              ================================================================ */}
+          {overlays.cajaOpen && (
+            <TouchableOpacity activeOpacity={1} onPress={overlays.closeCaja}
+              style={[StyleSheet.absoluteFill, { zIndex: 750 }]}>
+              <Animated.View style={{
+                position: 'absolute',
+                left: overlays.positions.caja.left, top: overlays.cajaSlideTop,
+                width: overlays.positions.caja.width, height: overlays.positions.caja.height,
+                zIndex: 800,
+              }}>
+                {SPRITE_ASSETS['registradora-arriba'] && !FORCE_COLOR_BOXES
+                  ? <Image source={SPRITE_ASSETS['registradora-arriba']} style={styles.fill} resizeMode="stretch" />
+                  : <View style={[styles.overlayPanel, { width: overlays.positions.caja.width, height: overlays.positions.caja.height }]}>
+                      <Text style={styles.overlayTitle}>🧾  CAJA REGISTRADORA</Text>
+                      <Text style={styles.fbDims}>Toca fuera para cerrar</Text>
+                    </View>}
+              </Animated.View>
+            </TouchableOpacity>
+          )}
+
+          {/* Color Boxes de referencia (desarrollo) */}
+          {SHOW_REFERENCE_COLOR_BOXES && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {COLOR_ZONES.map(z => (
+                <View key={z.label} style={[styles.refBox, { top: px(z.top), height: px(z.height), backgroundColor: z.bg, borderBottomColor: z.border }]}>
+                  <Text style={styles.zoneTag}>{z.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Filtro atmosférico diegético */}
+          {ENABLE_SCREEN_FILTER && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: SCREEN_FILTER_COLOR, zIndex: 950 }]} pointerEvents="none" />
+          )}
+
         </View>
       </View>
     </View>
   );
 };
 
+// =========================================================================
+// ESTILOS (solo los propios de esta pantalla)
+// =========================================================================
 const styles = StyleSheet.create({
-  fullScreen: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  screenWrapper: {
-    flex: 1,
-    backgroundColor: '#050505',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  stageContainer: {
-    height: '100%',
-    aspectRatio: 412 / 873.5,
-    backgroundColor: '#0a0a0c',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-
-  cameraContainer: {
-    ...StyleSheet.absoluteFill,
-  },
-
-  colorBoxesLayer: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1,
-    display: 'none', // DESHABILITADO — reactivar quitando esta línea
-  },
-
-  colorBox1: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(0),
-    height: figmaH(131.1),
-    backgroundColor: 'rgba(213.32, 4.92, 4.92, 0.30)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(213.32, 4.92, 4.92, 0.60)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  colorBox2: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(131),
-    height: figmaH(218.5),
-    backgroundColor: 'rgba(182.91, 147.27, 49.25, 0.30)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  redDividerLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(349),
-    height: 4,
-    backgroundColor: colors.colorbox.dividerLine,
-    zIndex: 12,
-  },
-
-  colorBox3: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(349),
-    height: figmaH(305.9),
-    backgroundColor: 'rgba(51.08, 173.21, 181.93, 0.30)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  colorBox4: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(655),
-    height: figmaH(218.5),
-    backgroundColor: 'rgba(2.04, 12.73, 66.20, 0.30)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(2.04, 12.73, 66.20, 0.80)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  colorBoxContent: {
-    alignItems: 'center',
-    paddingHorizontal: scale(8),
-  },
-  boxTag: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    color: '#ffffff',
-    fontSize: moderateScale(9),
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    paddingHorizontal: scale(6),
-    paddingVertical: verticalScale(2),
-    borderRadius: 3,
-  },
-  boxDescription: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    color: '#e2e8f0',
-    fontSize: moderateScale(7),
-    marginTop: verticalScale(2),
-    textAlign: 'center',
-  },
-
-  // Zona táctil para inspección Top 25%
-  top25TouchZone: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: figmaY(131.1),
-    height: figmaH(218.5),
-    zIndex: 20, // Entre la reja (4) y la persiana (25)
-  },
-
-  // Sprite provisional del arma en mano (reposo sobre cajón derecho)
-  gunSprite: {
-    position: 'absolute',
-    left: figmaX(460),
-    top: figmaY(550),
-    width: figmaW(140),
-    height: figmaH(140),
-    zIndex: 45,
-    pointerEvents: 'none',
-  },
-
-  // Botón [ SHOOT ] en zona Top 25%
-  shootButton: {
-    position: 'absolute',
-    top: figmaY(215),
-    alignSelf: 'center',
-    backgroundColor: '#991b1b',
-    borderWidth: 2,
-    borderColor: '#f87171',
-    borderRadius: 6,
-    paddingHorizontal: scale(20),
-    paddingVertical: verticalScale(10),
-    alignItems: 'center',
-    zIndex: 50,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-  },
-  shootButtonText: {
-    fontFamily: TYPOGRAPHY.stamps,
-    color: '#ffffff',
-    fontSize: moderateScale(14),
-    fontWeight: 'bold',
-    letterSpacing: 2,
-  },
-  shootSubText: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    color: '#fecaca',
-    fontSize: moderateScale(7),
-    marginTop: verticalScale(2),
-  },
-
-  // Filtro de pantalla completa (#34495E con opacidad al 53%)
-  screenFilterOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: SCREEN_FILTER_COLOR,
-    zIndex: 70, // Por encima de toda la escena y elementos móviles sin bloquear toques
-  },
+  fullScreen:    { flex: 1, backgroundColor: '#000' },
+  screenWrapper: { flex: 1, backgroundColor: '#050505', justifyContent: 'center', alignItems: 'center' },
+  stage:         { backgroundColor: '#040711', position: 'relative', overflow: 'visible' },
+  camera:        { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+  fill:          { width: '100%', height: '100%' },
+  fallback:      { flex: 1, borderWidth: 1, borderRadius: 2, padding: 2, justifyContent: 'center', alignItems: 'center' },
+  fbLabel:       { fontSize: 7.5, color: '#fff', fontWeight: 'bold', textAlign: 'center', letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
+  fbDims:        { fontSize: 6.5, color: '#cbd5e1', textAlign: 'center', marginTop: 1, opacity: 0.85 },
+  inspectZone:   { position: 'absolute', left: 0, right: 0, backgroundColor: 'transparent' },
+  carouselArrow: { position: 'absolute', width: 28, height: 36, backgroundColor: 'rgba(0,0,0,0.68)', borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center', zIndex: 200 },
+  carouselArrowText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  payButton:     { position: 'absolute', backgroundColor: 'rgba(0,255,102,0.15)', borderWidth: 1, borderColor: '#00ff66', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3 },
+  payButtonText: { fontFamily: TYPOGRAPHY.systemPC, color: '#00ff66', fontSize: 10, letterSpacing: 1 },
+  overlayPanel:  { backgroundColor: 'rgba(15,23,42,0.97)', borderWidth: 1, borderColor: '#00ff66', borderRadius: 4, justifyContent: 'center', alignItems: 'center', padding: 14 },
+  overlayTitle:  { fontFamily: TYPOGRAPHY.systemPC, color: '#00ff66', fontSize: 14, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8 },
+  refBox:        { position: 'absolute', left: 0, right: 0, justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, zIndex: 900 },
+  zoneTag:       { fontFamily: TYPOGRAPHY.systemPC, fontSize: 12, color: '#fff', letterSpacing: 1, fontWeight: 'bold', opacity: 0.95 },
+  aimButtons:    { position: 'absolute', bottom: 40, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20 },
+  aimBtnSecondary: { backgroundColor: 'rgba(71,85,105,0.88)', borderWidth: 1, borderColor: '#64748b', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 3 },
+  aimBtnDanger:  { backgroundColor: 'rgba(127,29,29,0.88)', borderWidth: 1, borderColor: '#ef4444', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 3 },
+  aimBtnText:    { fontFamily: TYPOGRAPHY.systemPC, color: '#fff', fontSize: 11, letterSpacing: 1 },
 });

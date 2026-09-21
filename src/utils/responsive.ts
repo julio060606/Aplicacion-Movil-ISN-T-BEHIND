@@ -45,6 +45,40 @@ export const figmaH = (height: number): number => {
 };
 
 /**
+ * =========================================================================
+ * NUEVA ARQUITECTURA 2.5D (FIGMA 1962 x 3168 - VIEWPORT 646 x 1456)
+ * =========================================================================
+ * - Viewport anclado en: left: 619px, top: 748px
+ * - Relación de aspecto: 646 / 1456 (~0.4436, equivalente a 15cm x 6.7cm)
+ */
+export const FIGMA_25D = {
+  CANVAS_WIDTH: 1926,
+  CANVAS_HEIGHT: 1456,
+  VIEWPORT_WIDTH: 646,
+  VIEWPORT_HEIGHT: 1456,
+  OFFSET_X: 619,
+  OFFSET_Y: 0,
+};
+
+export const f25dScale = SCREEN_HEIGHT / FIGMA_25D.VIEWPORT_HEIGHT;
+
+export const f25dX = (canvasX: number): number => {
+  return Math.round((canvasX - FIGMA_25D.OFFSET_X) * f25dScale);
+};
+
+export const f25dY = (canvasY: number): number => {
+  return Math.round((canvasY - FIGMA_25D.OFFSET_Y) * f25dScale);
+};
+
+export const f25dW = (width: number): number => {
+  return Math.round(width * f25dScale);
+};
+
+export const f25dH = (height: number): number => {
+  return Math.round(height * f25dScale);
+};
+
+/**
  * Escala horizontal proporcional basada en el ancho del dispositivo
  */
 export const scale = (size: number): number => {

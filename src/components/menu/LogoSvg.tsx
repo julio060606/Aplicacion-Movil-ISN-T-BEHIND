@@ -41,7 +41,7 @@ export const LogoSvg = () => {
   return (
     <View style={styles.clipperContainer}>
       <Animated.Image
-        source={require('../../assets/sprites/sello-cst-2.png')}
+        source={require('../../../assets/icon.png')}
         style={[styles.logoImage, { transform: [{ rotate: spin }] }]}
       />
     </View>

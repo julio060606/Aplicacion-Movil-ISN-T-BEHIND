@@ -6,7 +6,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 // 1. Tipos de navegación y proveedores
 import { RootStackParamList } from './src/models/types';
 import { FontProvider } from './src/components/core/FontProvider';
-import { AssetProvider } from './src/context/AssetContext';
 
 // 2. Pantallas y navegadores del flujo de juego
 import { MenuDrawerNavigator } from './src/navigation/MenuDrawerNavigator';
@@ -22,8 +21,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   return (
     <FontProvider>
-      <AssetProvider>
-        <NavigationContainer>
+      <NavigationContainer>
           <Stack.Navigator
             initialRouteName="MenuDrawer"
             screenOptions={{
@@ -46,7 +44,6 @@ export default function App() {
             <Stack.Screen name="Shift" component={ShiftScreen} />
           </Stack.Navigator>
         </NavigationContainer>
-      </AssetProvider>
     </FontProvider>
   );
 }

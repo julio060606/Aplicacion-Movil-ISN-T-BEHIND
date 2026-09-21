@@ -33,5 +33,6 @@ export interface IVisitor {
   };
   expectedDecision: 'APPROVE' | 'REJECT';
   rejectionReason?: string;
-  isEntity: boolean; // Si es un impostor/anomalía
+  // NOTA: 'isEntity' eliminado según Ley L2 (Cero monstruos sobrenaturales).
+  triggersTrauma?: boolean; // Si puede disparar una secuencia de PTSD/estrés
 }
