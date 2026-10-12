@@ -1,121 +1,44 @@
 // src/screens/DailyIntroScreen.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../models/types';
-import { colors } from '../theme/colors';
-import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import { ScreenDelay } from '../components/ui/ScreenDelay';
+import { RadioBroadcastView } from '../components/radio/RadioBroadcastView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DailyIntro'>;
 
-export const DailyIntroScreen = ({ navigation, route }: Props) => {
-  const { dayNumber } = route.params;
+const DAY_1_PAGES = [
+  'Atencion ciudadanos de Portwall.\n\nLa red de transmision del C.S.T. informa que el toque de queda comenzara puntual a las 00:00 HORAS.\n\nTodo transito no autorizado en el Sector 4 sera sancionado.',
+  'Reporten cualquier anomalia quimica o sintoma de mareo a los agentes en patrulla.\n\nEl suministro en mostrador queda formalmente habilitado.\n\nCumpla con su jornada.',
+];
+
+export const DailyIntroScreen: React.FC<Props> = ({ navigation, route }) => {
+  const dayNumber = route.params?.dayNumber ?? 1;
 
   const handleStartShift = () => {
+    // Transición directa al turno de trabajo sobre fondo #0C0C0C
     navigation.navigate('GameInterface', { currentDay: dayNumber });
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+    <ScreenDelay delay={500} backgroundColor="#0C0C0C">
+      <View style={styles.screen}>
+        <StatusBar hidden />
 
-      {/* ENCABEZADO BUROCRÁTICO CST */}
-      <View style={styles.headerBurocrata}>
-        <Text style={styles.burocrataText}>CONSORCIO INDUSTRIAL S.T. - C.S.T.</Text>
-        <Text style={styles.burocrataText}>CÓDIGO DE AUTORIZACIÓN DE TURNO</Text>
+        <RadioBroadcastView
+          pages={DAY_1_PAGES}
+          dayNumber={dayNumber}
+          onStartShift={handleStartShift}
+        />
       </View>
-
-      {/* BLOQUE CENTRAL DEL DÍA DINÁMICO */}
-      <View style={styles.dayBlock}>
-        <View style={styles.customStrikeLine} />
-        <Text style={styles.dayNumberText}>[ DÍA {dayNumber} ]</Text>
-        <View style={styles.customStrikeLine} />
-      </View>
-
-      {/* INSTRUCCIONES INICIALES */}
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoText}>SU ESTACIÓN DE TRABAJO HA SIDO HABILITADA.</Text>
-        <Text style={styles.infoText}>EVITE ERRORES. EL CONSORCIO NO PERDONA.</Text>
-      </View>
-
-      {/* BOTÓN DE ENTRADA AL TURNO */}
-      <TouchableOpacity
-        style={styles.startButton}
-        activeOpacity={0.8}
-        onPress={handleStartShift}
-      >
-        <Text style={styles.startButtonText}>[ INICIAR TURNO ]</Text>
-      </TouchableOpacity>
-    </View>
+    </ScreenDelay>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: verticalScale(50),
-    paddingHorizontal: scale(20),
-  },
-  headerBurocrata: {
-    alignItems: 'center',
-    marginBottom: verticalScale(20),
-  },
-  burocrataText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(11),
-    color: colors.textSubtle,
-    letterSpacing: scale(1),
-    marginBottom: verticalScale(4),
-  },
-  dayBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    marginVertical: verticalScale(20),
-  },
-  customStrikeLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: colors.stampRed,
-    marginHorizontal: scale(12),
-    opacity: 0.85,
-  },
-  dayNumberText: {
-    fontFamily: 'Syne-Mono',
-    fontSize: moderateScale(30),
-    color: colors.textPrimary,
-    fontWeight: 'bold',
-    letterSpacing: scale(-1),
-  },
-  infoBlock: {
-    alignItems: 'center',
-    marginVertical: verticalScale(20),
-  },
-  infoText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(13),
-    color: colors.textMuted,
-    lineHeight: verticalScale(22),
-    textAlign: 'center',
-  },
-  startButton: {
-    marginTop: verticalScale(30),
-    paddingVertical: verticalScale(14),
-    paddingHorizontal: scale(36),
-    backgroundColor: colors.surfaceCard,
-    borderWidth: 1,
-    borderColor: colors.borderMedium,
-    borderRadius: 2,
-  },
-  startButtonText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(15),
-    color: colors.textPrimary,
-    letterSpacing: scale(2),
-    fontWeight: 'bold',
+    backgroundColor: '#0C0C0C', // Fondo 0C0C0C permanente
   },
 });

@@ -39,7 +39,7 @@ export const LogoSvg = () => {
   });
 
   return (
-    <View style={styles.clipperContainer}>
+    <View style={styles.clipperContainer} pointerEvents="none">
       <Animated.Image
         source={require('../../../assets/icon.png')}
         style={[styles.logoImage, { transform: [{ rotate: spin }] }]}
@@ -50,17 +50,19 @@ export const LogoSvg = () => {
 
 const styles = StyleSheet.create({
   clipperContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
     width: screenDimensions.width,
-    height: LOGO_SIZE,
     alignItems: 'flex-start',
     justifyContent: 'center',
-    overflow: 'hidden',
-    left: scale(-20),
   },
   logoImage: {
     width: LOGO_SIZE,
     height: LOGO_SIZE,
     resizeMode: 'contain',
     marginLeft: -(LOGO_SIZE / 2),
+    opacity: 0.15, // opacidad sutil para no robar atención
   },
 });

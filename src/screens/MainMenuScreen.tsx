@@ -1,204 +1,281 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Text, StatusBar } from 'react-native';
-import { DrawerActions } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+// src/screens/MainMenuScreen.tsx
+/**
+ * Menú principal de ISN'T BEHIND.
+ *
+ * Diseño:
+ *   - Logo industrial giratorio (lento, 40s por vuelta) a la izquierda.
+ *   - Título "ISN'T BEHIND" en Bebas Neue (grande) con micro-temblor analógico
+ *     + efecto typewriter al montar la pantalla.
+ *   - Línea decorativa azul CST bajo el título.
+ *   - Tres opciones con efecto "selección DOS" al presionar:
+ *       [ STORY ]    → StorySaveSelect
+ *       [ SETTINGS ] → Settings
+ *       [ EXTRAS ]   → Extras
+ *   - Versión de sistema en el pie.
+ *   - Overlay de suciedad/scanlines CRT sobre todo.
+ *
+ * Sprites futuros:
+ *   - Fondo de escritorio (mesa): src/assets/sprites/menu/desk.webp
+ *   - Lluvia de colillas:         src/assets/sprites/menu/cigarette.webp
+ *     (Múltiples instancias posicionadas absolutamente con animación de caída)
+ */
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../models/types';
-import { TitleSvg } from '../components/menu/TitleSvg';
+import { useMenuTheme } from '../context/MenuThemeContext';
+import { MenuOption } from '../components/menu/MenuOption';
+import { TypewriterText } from '../components/menu/TypewriterText';
+import { ScreenDirtOverlay } from '../components/ui/ScreenDirtOverlay';
+import { ScreenDelay } from '../components/ui/ScreenDelay';
 import { LogoSvg } from '../components/menu/LogoSvg';
-import { colors } from '../theme/colors';
-import { scale, verticalScale, moderateScale } from '../utils/responsive';
 import { TYPOGRAPHY } from '../theme/typography';
+import { moderateScale, scale, verticalScale } from '../utils/responsive';
 
-type Props = NativeStackScreenProps<RootStackParamList, any>;
+// ── Constantes de animación ────────────────────────────────────────────────
 
-export const MainMenuScreen = ({ navigation }: Props) => {
-  const handleStartStory = () => {
-    navigation.navigate('OperatorRegistration');
-  };
+/**
+ * Micro-temblor del título — amplitudes en px, duraciones desfasadas.
+ * Casi imperceptible, solo transmite inquietud inconsciente.
+ */
+const SHAKE = {
+  AMPLITUDE_X: 0.6,
+  AMPLITUDE_Y: 0.4,
+  DURATION_X: 1800,
+  DURATION_Y: 2500,
+} as const;
 
-  const handleOpenSettings = () => {
-    (navigation as any).navigate('Settings');
-  };
+// ── Componente ─────────────────────────────────────────────────────────────
 
-  const handleOpenDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
+export const MainMenuScreen = () => {
+  const { theme } = useMenuTheme();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  const shakeX = useRef(new Animated.Value(0)).current;
+  const shakeY = useRef(new Animated.Value(0)).current;
+
+  // ── Micro-temblor del título ───────────────────────────────────────────
+
+  useEffect(() => {
+    const loopX = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shakeX, {
+          toValue: SHAKE.AMPLITUDE_X,
+          duration: SHAKE.DURATION_X / 2,
+          easing: Easing.sin,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeX, {
+          toValue: -SHAKE.AMPLITUDE_X,
+          duration: SHAKE.DURATION_X / 2,
+          easing: Easing.sin,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    const loopY = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shakeY, {
+          toValue: SHAKE.AMPLITUDE_Y,
+          duration: SHAKE.DURATION_Y / 2,
+          easing: Easing.sin,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeY, {
+          toValue: -SHAKE.AMPLITUDE_Y,
+          duration: SHAKE.DURATION_Y / 2,
+          easing: Easing.sin,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loopX.start();
+    loopY.start();
+
+    return () => {
+      loopX.stop();
+      loopY.stop();
+    };
+  }, [shakeX, shakeY]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────
+
+  const handleStory    = () => navigation.navigate('StorySaveSelect');
+  const handleSettings = () => navigation.navigate('Settings');
+  const handleExtras   = () => navigation.navigate('Extras');
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+    <ScreenDelay>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <StatusBar hidden />
 
-      {/* BOTÓN SUPERIOR DE APERTURA DEL DRAWER */}
-      <TouchableOpacity
-        style={styles.drawerButton}
-        activeOpacity={0.7}
-        onPress={handleOpenDrawer}
-      >
-        <Text style={styles.drawerButtonText}>[ ☰ PANEL CST ]</Text>
-      </TouchableOpacity>
+        {/*
+          ── FONDO FUTURO ──────────────────────────────────────────────────────
+          Cuando tengas los sprites del escritorio y las colillas:
 
-      <View style={styles.mainContainer}>
-        {/* COLUMNA IZQUIERDA: LOGO INDUSTRIAL GIRATORIO */}
-        <View style={styles.leftColumn}>
+          1. Fondo de la mesa (imagen estática 2.5D):
+             <Image
+               source={require('../assets/sprites/menu/desk.webp')}
+               style={StyleSheet.absoluteFillObject}
+               resizeMode="cover"
+             />
+
+          2. Colillas cayendo (instanciar varias con posición y animación random):
+             <CigaretteRain />   ← componente a crear en components/menu/
+          ──────────────────────────────────────────────────────────────────── */}
+
+        <View style={styles.mainContainer}>
+          {/* LOGO de fondo giratorio */}
           <LogoSvg />
-        </View>
 
-        {/* COLUMNA DERECHA: TÍTULO Y OPCIONES */}
-        <View style={styles.rightColumn}>
-          {/* Título vectorial del juego */}
-          <View style={styles.titleSection}>
-            <TitleSvg />
+          {/* COLUMNA IZQUIERDA: Vacía o con elementos secundarios */}
+          <View style={styles.leftColumn}>
           </View>
 
-          {/* Menú de opciones */}
-          <View style={styles.menuSection}>
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              activeOpacity={0.6}
-              onPress={handleStartStory}
-            >
-              <View style={styles.lineWrapper}>
-                <View style={styles.customLine} />
-                <Text style={styles.menuOptionText}>[ STORY / ACCESO ]</Text>
-                <View style={styles.customLine} />
-              </View>
-            </TouchableOpacity>
+          {/* COLUMNA DERECHA: Título + opciones + pie */}
+          <View style={styles.rightColumn}>
 
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              activeOpacity={0.6}
-              onPress={handleOpenSettings}
-            >
-              <View style={styles.lineWrapper}>
-                <View style={styles.customLine} />
-                <Text style={styles.menuOptionText}>[ SETTINGS ]</Text>
-                <View style={styles.customLine} />
-              </View>
-            </TouchableOpacity>
+            {/* Título con micro-temblor + efecto typewriter */}
+            <View style={styles.titleSection}>
+              <Animated.View
+                style={{
+                  transform: [
+                    { translateX: shakeX },
+                    { translateY: shakeY },
+                  ],
+                }}
+              >
+                <View style={styles.titleWrapper}>
+                  <TypewriterText
+                    text="ISN'T"
+                    speed={55}
+                    startDelay={200}
+                    style={[styles.titleTextSmall, { color: theme.text }]}
+                  />
+                  <TypewriterText
+                    text="BEHIND"
+                    speed={55}
+                    startDelay={500}
+                    style={[styles.titleTextLarge, { color: theme.text }]}
+                  />
+                </View>
+              </Animated.View>
 
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              activeOpacity={0.6}
-              onPress={() => (navigation as any).navigate('ManualDossier')}
-            >
-              <View style={styles.lineWrapper}>
-                <View style={styles.customLine} />
-                <Text style={styles.menuOptionText}>[ EXPEDIENTE CST ]</Text>
-                <View style={styles.customLine} />
-              </View>
-            </TouchableOpacity>
-          </View>
+              {/* Línea azul CST decorativa */}
+              <View style={[styles.titleDivider, { backgroundColor: theme.accent }]} />
+            </View>
 
-          {/* Créditos / Pie de terminal */}
-          <View style={styles.footerSection}>
-            <TouchableOpacity
-              activeOpacity={0.6}
-              onPress={handleOpenDrawer}
-            >
-              <View style={styles.lineWrapper}>
-                <View style={[styles.customLine, styles.dimmedLine]} />
-                <Text style={styles.footerButtonText}>ver menú lateral [DRAWER]</Text>
-                <View style={[styles.customLine, styles.dimmedLine]} />
-              </View>
-            </TouchableOpacity>
+            {/* Opciones del menú */}
+            <View style={styles.menuSection}>
+              <MenuOption label="[ STORY ]"    onPress={handleStory} />
+              <MenuOption label="[ SETTINGS ]" onPress={handleSettings} />
+              <MenuOption label="[ EXTRAS ]"   onPress={handleExtras} />
+            </View>
+
+            {/* Pie de terminal */}
+            <View style={styles.footerSection}>
+              <Text style={[styles.footerText, { color: theme.textMuted }]}>
+                CONSORCIO S.T. // v1.0.0-ALPHA
+              </Text>
+            </View>
+
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+
+        {/* Overlay de scanlines + viñeta (siempre al final, sobre todo) */}
+        <ScreenDirtOverlay />
+
+      </SafeAreaView>
+    </ScreenDelay>
   );
 };
+
+// ── Estilos ────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  drawerButton: {
-    position: 'absolute',
-    top: verticalScale(14),
-    left: scale(16),
-    zIndex: 20,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 4,
-    paddingHorizontal: scale(10),
-    paddingVertical: verticalScale(4),
-  },
-  drawerButtonText: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(9),
-    color: colors.crtAmber,
-    letterSpacing: 0.5,
   },
   mainContainer: {
     flex: 1,
     flexDirection: 'row',
   },
+
+  // Columna izquierda: Vacía o con elementos secundarios
   leftColumn: {
-    flex: 0.35,
+    flex: 0.1,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
+
+  // Columna derecha: título + menú
   rightColumn: {
-    flex: 0.65,
+    flex: 0.9,
+    paddingRight: scale(20),
     flexDirection: 'column',
   },
+
+  // Sección del título — ocupa la mitad superior
   titleSection: {
-    flex: 2.1,
+    flex: 2.2,
     justifyContent: 'flex-end',
-    alignItems: 'center',
-    width: '100%',
-    paddingBottom: verticalScale(8),
+    paddingBottom: verticalScale(14),
   },
+  titleWrapper: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  titleTextSmall: {
+    fontFamily: TYPOGRAPHY.menuTitle,
+    fontSize: moderateScale(54),
+    lineHeight: moderateScale(54),
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  titleTextLarge: {
+    fontFamily: TYPOGRAPHY.menuTitle,
+    fontSize: moderateScale(72),
+    lineHeight: moderateScale(72),
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: moderateScale(-18), // ← acerca BEHIND a ISN'T
+  },
+  titleDivider: {
+    height: 3,
+    width: '85%',
+    marginTop: verticalScale(12),
+  },
+
+  // Sección de opciones
   menuSection: {
-    flex: 1.2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
+    flex: 1.3,
+        justifyContent: 'flex-start',         // ← Las mueve arriba
+    paddingTop: verticalScale(10), 
   },
+
+  // Pie de página
   footerSection: {
-    flex: 1.0,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    width: '60%',
-    alignSelf: 'center',
-    paddingTop: verticalScale(40),
+    flex: 0.5,
+    justifyContent: 'flex-end',
+    paddingBottom: verticalScale(20),
   },
-  buttonWrapper: {
-    width: '100%',
-    paddingVertical: verticalScale(6),
-    marginVertical: verticalScale(4),
-    alignItems: 'center',
-  },
-  lineWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '95%',
-  },
-  customLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.borderMedium,
-    opacity: 0.5,
-    marginHorizontal: scale(8),
-  },
-  dimmedLine: {
-    opacity: 0.2,
-  },
-  menuOptionText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(17),
-    color: colors.textSecondary,
-    opacity: 0.9,
-    letterSpacing: scale(1.5),
-  },
-  footerButtonText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(12),
-    color: colors.textSubtle,
-    letterSpacing: scale(1),
-    opacity: 0.7,
+  footerText: {
+    fontFamily: TYPOGRAPHY.menuOption,
+    fontSize: moderateScale(10),
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });

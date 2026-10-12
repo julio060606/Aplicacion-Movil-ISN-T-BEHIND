@@ -61,6 +61,33 @@ export const colors = {
   mockGraybox: '#2a2a2a',
   mockBorder: '#3a3a3a',
   mockAccent: '#555555',
+
+  // =========================================================================
+  // PALETA DE TEMAS DEL MENÚ (pre-juego exclusivamente)
+  // Oscuro: Terminal/noche    |    Claro: Burocracia/papel
+  // =========================================================================
+  menuTheme: {
+    dark: {
+      background: '#12161A',
+      surface: '#1A2028',
+      text: '#D9C89A',
+      textMuted: '#7A8A93',
+      accent: '#2E86C1',        // Azul CST corporativo
+      accentText: '#FFFFFF',    // Texto sobre el acento (efecto DOS)
+      divider: '#2A3540',
+      border: '#2E3E4A',
+    },
+    light: {
+      background: '#D9C89A',
+      surface: '#C8B88A',
+      text: '#2C2C2C',
+      textMuted: '#6A5A4A',
+      accent: '#2E86C1',        // Azul CST corporativo (igual en ambos temas)
+      accentText: '#FFFFFF',
+      divider: '#B8A87A',
+      border: '#A89868',
+    },
+  },
 } as const;
 
 export type ColorTokens = keyof typeof colors;

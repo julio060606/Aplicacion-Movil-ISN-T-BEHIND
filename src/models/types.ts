@@ -40,6 +40,8 @@ export type RootStackParamList = {
   MenuDrawer: undefined;
   MainMenu: undefined;
   OperatorRegistration: undefined;
+  StorySaveSelect: undefined;   // Selección / borrado de partida
+  Extras: undefined;            // Créditos, estadísticas, easter eggs
   WeeklyIntro: { weekNumber?: number };
   DailyIntro: { dayNumber: number };
   GameInterface: { currentDay: number; shiftConfigId?: string };

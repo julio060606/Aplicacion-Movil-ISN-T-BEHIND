@@ -1,136 +1,53 @@
 // src/screens/WeeklyIntroScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar } from 'react-native';
+import React from 'react';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../models/types';
-import { colors } from '../theme/colors';
-import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import { ScreenDelay } from '../components/ui/ScreenDelay';
+import { TerminalMailView } from '../components/terminal/TerminalMailView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyIntro'>;
 
-const TRANSMISSION_TEXT =
-  '>> CONEXIÓN ESTABLECIDA... C.S.T. RED DE TRANSMISIÓN LOCAL... SECTOR 4 APERTURADO... ESPERE NUEVAS DIRECTIVAS.';
+// Contenido acotado y dividido para no saturar la pantalla y dejar espacio inferior
+const WEEK_1_PAGES = [
+  // Página 1: Concesión ratificada
+  'Estimado Sr. Aris:\n\nNos complace ratificar que sus credenciales corporativas han sido aprobadas.\n\nA traves de su gestion personal, se le ha otorgado la concesion exclusiva del puesto comercial en el Cuadrante 4 de Portwall.\n\nSu personal de mostrador queda formalmente autorizado.',
 
-export const WeeklyIntroScreen = ({ navigation, route }: Props) => {
+  // Página 2: Directivas operativas breves
+  'DIRECTIVAS PARA EL OPERARIO:\n\n1. Apertura estricta a las 12:00 PM. El toque de queda inicia a las 00:00 AM.\n2. Verifique identificacion civil y comanda de cada visitante sin excepcion.\n3. Todo faltante acarreara sanciones de Clase A y la cancelacion de su estadia.\n\nCumpla con su labor.',
+];
+
+export const WeeklyIntroScreen: React.FC<Props> = ({ navigation, route }) => {
   const weekNumber = route.params?.weekNumber ?? 1;
-  const animatedOpacity = useRef(new Animated.Value(0)).current;
-  const [displayText, setDisplayText] = useState('');
 
-  useEffect(() => {
-    let charIndex = 0;
-    const textInterval = setInterval(() => {
-      if (charIndex <= TRANSMISSION_TEXT.length) {
-        setDisplayText(TRANSMISSION_TEXT.substring(0, charIndex));
-        charIndex++;
-      } else {
-        clearInterval(textInterval);
-      }
-    }, 50);
-
-    Animated.timing(animatedOpacity, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
-
-    return () => clearInterval(textInterval);
-  }, [animatedOpacity]);
-
-  const handleContinue = () => {
-    navigation.navigate('DailyIntro', { dayNumber: (weekNumber - 1) * 7 + 1 });
+  const handleMailComplete = () => {
+    // Avanza a la pantalla de Radio y Día correspondiente
+    const dayNumber = (weekNumber - 1) * 7 + 1;
+    navigation.navigate('DailyIntro', { dayNumber });
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+    <ScreenDelay delay={500} backgroundColor="#0C0C0C">
+      <View style={styles.screen}>
+        <StatusBar hidden />
 
-      {/* MOCK VISUAL / SPRITE: RADIO DE TRANSMISIÓN */}
-      <View style={styles.radioMockContainer}>
-        <View style={styles.radioSpeakerGrid}>
-          <View style={styles.speakerLine} />
-          <View style={styles.speakerLine} />
-          <View style={styles.speakerLine} />
-        </View>
-        <Text style={styles.radioIndicatorText}>[ RECEPTOR AM - FREC. 84.2 ]</Text>
+        <TerminalMailView
+          from="DIR_LOGISTICA@STRATTON-TATE.CORP"
+          to="M. ARIS // CONCESIONARIO #402"
+          date="10/11/2004 - 08:30:14"
+          subject="RATIFICACION DE CONCESION // SECTOR 4"
+          refCode={`CST-ORD-WEEK-${weekNumber}`}
+          pages={WEEK_1_PAGES}
+          onComplete={handleMailComplete}
+        />
       </View>
-
-      {/* TEXTO ANIMADO DE MÁQUINA DE ESCRIBIR */}
-      <Animated.Text style={[styles.transmissionText, { opacity: animatedOpacity }]}>
-        {displayText}
-        <Text style={styles.cursor}>█</Text>
-      </Animated.Text>
-
-      {/* BOTÓN DE CONFIRMACIÓN */}
-      <TouchableOpacity
-        style={styles.continueButton}
-        activeOpacity={0.7}
-        onPress={handleContinue}
-      >
-        <Text style={styles.buttonText}>[ CONFIRMAR RECEPCIÓN ]</Text>
-      </TouchableOpacity>
-    </View>
+    </ScreenDelay>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: scale(20),
-  },
-  radioMockContainer: {
-    width: scale(180),
-    height: scale(140),
-    borderWidth: 1,
-    borderColor: colors.borderMedium,
-    backgroundColor: colors.surfaceCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: verticalScale(35),
-    borderRadius: 4,
-  },
-  radioSpeakerGrid: {
-    width: '70%',
-    gap: verticalScale(6),
-    marginBottom: verticalScale(12),
-  },
-  speakerLine: {
-    height: 2,
-    backgroundColor: colors.borderMedium,
-    opacity: 0.7,
-  },
-  radioIndicatorText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(10),
-    color: colors.crtGreenDim,
-    letterSpacing: scale(1),
-  },
-  transmissionText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(15),
-    color: colors.crtGreen,
-    textAlign: 'center',
-    lineHeight: verticalScale(22),
-    marginBottom: verticalScale(40),
-    paddingHorizontal: scale(10),
-  },
-  cursor: {
-    color: colors.crtGreen,
-  },
-  continueButton: {
-    borderWidth: 1,
-    borderColor: colors.crtGreen,
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: scale(28),
-    backgroundColor: colors.crtGreenGlow,
-    borderRadius: 2,
-  },
-  buttonText: {
-    fontFamily: 'Inconsolata-Light',
-    fontSize: moderateScale(14),
-    color: colors.crtGreen,
-    letterSpacing: scale(1.5),
+    backgroundColor: '#0C0C0C', // Fondo 0C0C0C solicitado
   },
 });

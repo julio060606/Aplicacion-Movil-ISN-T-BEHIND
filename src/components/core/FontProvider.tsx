@@ -8,7 +8,8 @@ import { colors } from '../../theme/colors';
 // =========================================================================
 // IMPORTACIÓN DE TODAS LAS FAMILIAS TIPOGRÁFICAS (AÑOS 2000 / CORPORATIVO)
 // =========================================================================
-import { useFonts, Inconsolata_300Light } from '@expo-google-fonts/inconsolata';
+import { useFonts, Inconsolata_300Light, Inconsolata_700Bold } from '@expo-google-fonts/inconsolata';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
 import { SyneMono_400Regular } from '@expo-google-fonts/syne-mono';
 import { ShareTechMono_400Regular } from '@expo-google-fonts/share-tech-mono';
 import { VT323_400Regular } from '@expo-google-fonts/vt323';
@@ -32,8 +33,12 @@ export const FontProvider = ({ children }: FontProviderProps) => {
 
   // 1. Carga centralizada y asíncrona del ecosistema tipográfico completo
   const [fontsLoaded, fontError] = useFonts({
+    // Título principal del menú (publicidad industrial / propaganda corporativa)
+    'BebasNeue-Regular': BebasNeue_400Regular,
+
     // System PC / CRT
     'Inconsolata-Light': Inconsolata_300Light,
+    'Inconsolata-Bold': Inconsolata_700Bold,
 
     // Sellos Oficiales y Día
     'Syne-Mono': SyneMono_400Regular,

@@ -31,19 +31,21 @@
 | **Registro Operador** | `OperatorRegistrationScreen.tsx` | ✅ Estable | Formulario de contrato con CST |
 | **Expediente / Reglas** | `DossierScreen.tsx` | ✅ Estable | Pestañas de directivas y anomalías |
 | **Ajustes** | `SettingsScreen.tsx` | ✅ Estable | Configuración de audio y vibración |
-| **Turno / Juego** | `ShiftScreen.tsx` | ✅ Modularizado | Orquestador puro de 390 líneas conectando los 4 hooks + GameSprite |
+| **Turno / Juego** | `ShiftScreen.tsx` | ✅ Modularizado (Fase 2) | Orquestador puro de 288 líneas (< 300 líneas). Hotspots TOGGLE BOTONS, expansión de cajones, caja pos 2 y PC abierto. |
 
-### Sistemas de interacción en `ShiftScreen`
-| Sistema | Hook Responsable | Estado |
+### Sistemas de interacción en `ShiftScreen` (Fase 2)
+| Sistema | Hook / Componente Responsable | Estado |
 |---|---|---|
-| `roll-up-door` (persiana) | `ShiftScreen` + `sceneConfig.panConfig` | ✅ Funcional (PanResponder vertical con snap) |
-| `lampara-cabeza` | `useSceneCamera` + `sceneConfig.panConfig` | ✅ Funcional (Drag libre ±80px H / ±60px V, swipe reset) |
-| `pc` → monitor overlay | `useOverlays` (`opensOverlay: 'monitor'`) | ✅ Funcional (Zoom 0.88→1 + dim 72%, tap fuera cierra) |
-| `carrusel-mesa` | `useDrawers` + `useSceneCamera` | ✅ Funcional (Zoom cámara 1.28×, flechas ❮❯, botón COBRAR) |
-| `cajon-1` / `cajon-2` | `useDrawers` (`drawerConfig`) | ✅ Funcional (Apertura animada, flechas ❮❯ navegan ítems) |
-| `caja-carton` | `useDrawers` | ✅ Funcional (Tap abre submenu placeholder) |
-| `apuntar` | `useOverlays` | ✅ Funcional (Overlay zIndex 999, bloquea todo, GUARDAR/DISPARAR) |
-| `caja-registradora` | `useOverlays` | ✅ Funcional (Slide animado desde abajo + dim, trigger con COBRAR) |
+| `roll-up-door` (persiana) | `ShiftScreen` + `sceneConfig.panConfig` | ✅ Límite calibrado al fin de la Zona A inferior (`410.17 px` Figma) con snap vertical |
+| `pc` → modal PC Abierto | `useOverlays` + `<SceneOverlays>` | ✅ `pc_abierto` (1740x1741) + `pantalla_negra` (298x225) con terminal CRT interactiva |
+| `cajon-1` | `useDrawers` (3 fases) | ✅ Hotspot `toggle cajon 1`: cerrado → mitad → completo → cerrado con expansión a la derecha |
+| `cajon-2` | `useDrawers` (3 fases) | ✅ Hotspot `toggle cajon 2`: cerrado → mitad → completo → cerrado con expansión a la derecha |
+| `caja-carton` | `useDrawers` (2 posiciones) | ✅ Hotspot `toggle caja`: posición 1 (fondo zIndex 8) ↔ posición 2 (por encima de todo zIndex 50) |
+| Exclusión mutua Caja / Cajones | `useDrawers` | ✅ Caja abierta bloquea cajones; cualquier cajón abierto bloquea mover la caja |
+| Hotspots / TOGGLE BOTONS | `viewportConfig.ts` | ✅ 8 zonas táctiles calibradas según Figma. Toggle debug `SHOW_TOGGLE_HITBOXES` |
+| `apuntar` | `useOverlays` + `<SceneOverlays>` | ✅ Funcional (Overlay zIndex 999, bloquea todo, GUARDAR/DISPARAR) |
+| `caja-registradora` | `useOverlays` + `<SceneOverlays>` | ✅ Funcional (Slide animado desde abajo + dim) |
+| Color Boxes de Referencia | `viewportConfig.ts` | ⏸ Deshabilitadas (`SHOW_REFERENCE_COLOR_BOXES = false`) |
 
 ---
 
@@ -93,11 +95,12 @@
 
 ## 5. ÚLTIMO PUNTO DE TRABAJO
 
-**Sesión:** 2026-09-21  
-**Tareas completadas:**
-- Limpieza total de código muerto (11 zombies eliminados, `AssetContext` y `assets.ts` removidos, `App.tsx` desvinculado, `src/core/` eliminado).
-- `sceneConfig.ts` enriquecido con `panConfig`, `drawerConfig`, `opensOverlay`.
-- 4 hooks especializados creados y probados.
-- `ShiftScreen.tsx` refactorizado como orquestador limpio.
-- Errores de tipado (`ViewStyle`, `camera`) corregidos al 100%.
-- Documentación de arquitectura (`04-arquitectura-tecnica.md`) y estado (`STATUS.md`) actualizados minuciosamente.
+**Sesión:** 2026-10-05  
+**Tareas completadas (Unidad 2 / Avance 2 del Sílabo Académico):**
+- **Servicio REST diegético (`cstNetworkService.ts`):** Consumo con `fetch` de JSONPlaceholder (`/posts`) y telemetría climática en tiempo real con Open-Meteo (`/forecast`).
+- **Terminal de Red y Dossier (`NetworkTerminalTab.tsx` en `DossierScreen.tsx`):**
+  - Implementación de comparativa transparente: Nube (REST API) vs Caché (`AsyncStorage`) vs Local Offline (ROM).
+  - Herramientas interactivas de manipulación de datos: buscador reactivo por texto/sector y filtros por categoría (`TODOS`, `CLOUD`, `CACHE`, `LOCAL`).
+- **Persistencia en AsyncStorage:** Gestión de caché de red (`@cst_cached_dispatches`), perfiles de operador (`@isnt_behind_operator_profile`) y preferencias de tema (`@isnt_behind_menu_theme`).
+- **Leyes de Ingeniería:** Todos los componentes por debajo de 300 líneas (Ley T5), TypeScript estricto sin `any`, y estética retro-brutalista preservada.
+- **Documento Académico:** Creado `docs/05-avance-2-academic.md` con la matriz de trazabilidad y guía de evaluación.

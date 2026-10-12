@@ -6,6 +6,7 @@ import { DossierTabParamList } from '../models/types';
 import { colors } from '../theme/colors';
 import { TYPOGRAPHY } from '../theme/typography';
 import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import { NetworkTerminalTab } from '../components/dossier/NetworkTerminalTab';
 
 // TAB 1: DIRECTIVAS DE INSPECCIÓN
 const DirectivesTab = () => (
@@ -79,34 +80,6 @@ const AnomaliesTab = () => (
   </ScrollView>
 );
 
-// TAB 3: REGISTROS Y ESTADO DE RED
-const SystemLogsTab = () => (
-  <ScrollView style={styles.tabScroll} contentContainerStyle={styles.tabContent}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardCode}>REF: LOGS-CST-NET-ONLINE</Text>
-      <Text style={styles.cardTitle}>REGISTRO DE AUDITORÍA Y ESTADO DE RED</Text>
-    </View>
-    <View style={styles.logItem}>
-      <Text style={styles.logTimestamp}>[ 03:14:02 - CST-NODE-4 ]</Text>
-      <Text style={styles.logText}>Conexión con terminal de garita establecida exitosamente.</Text>
-    </View>
-    <View style={styles.logItem}>
-      <Text style={styles.logTimestamp}>[ 03:14:28 - CST-NODE-4 ]</Text>
-      <Text style={styles.logText}>Filtro cromático #34495E verificado. Sensor óptico activo.</Text>
-    </View>
-    <View style={styles.logItem}>
-      <Text style={styles.logTimestamp}>[ 03:15:10 - CST-SERVER-CENTRAL ]</Text>
-      <Text style={styles.logText}>
-        Directiva de cuarentena aplicada. Prohibido abandonar el puesto hasta finalizar turno.
-      </Text>
-    </View>
-    <View style={styles.logItem}>
-      <Text style={styles.logTimestamp}>[ 03:16:00 - CST-HARDWARE ]</Text>
-      <Text style={styles.logText}>Módulo de almacenamiento AsyncStorage operativo (APF1/APF2).</Text>
-    </View>
-  </ScrollView>
-);
-
 const Tab = createBottomTabNavigator<DossierTabParamList>();
 
 export const DossierScreen = () => {
@@ -163,11 +136,11 @@ export const DossierScreen = () => {
       />
       <Tab.Screen
         name="SystemLogsTab"
-        component={SystemLogsTab}
+        component={NetworkTerminalTab}
         options={{
-          title: 'Logs CST',
-          headerTitle: 'TERMINAL // LOGS CST',
-          tabBarLabel: '[ LOGS SISTEMA ]',
+          title: 'Red C.S.T.',
+          headerTitle: 'TERMINAL // RED CST & LOGS',
+          tabBarLabel: '[ RED / LOGS ]',
         }}
       />
     </Tab.Navigator>
@@ -250,25 +223,5 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(8),
     color: '#f87171',
     fontWeight: 'bold',
-  },
-  logItem: {
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#0f172a',
-    padding: scale(10),
-    marginBottom: verticalScale(8),
-    borderRadius: 3,
-  },
-  logTimestamp: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(8),
-    color: colors.crtGreen,
-    marginBottom: 2,
-  },
-  logText: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(8.5),
-    color: '#94a3b8',
-    lineHeight: verticalScale(12),
   },
 });

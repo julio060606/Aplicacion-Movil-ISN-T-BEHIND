@@ -52,4 +52,12 @@ export const storageService = {
       return null;
     }
   },
+
+  async clearOperatorProfile(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(OPERATOR_KEY);
+    } catch (e) {
+      console.error('[StorageService] Error clearing operator profile', e);
+    }
+  },
 };

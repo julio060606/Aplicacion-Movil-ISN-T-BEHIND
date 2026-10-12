@@ -1,391 +1,245 @@
 // src/screens/OperatorRegistrationScreen.tsx
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { RootStackParamList } from '../models/types';
-import { colors } from '../theme/colors';
-import { TYPOGRAPHY } from '../theme/typography';
-import { scale, verticalScale, moderateScale } from '../utils/responsive';
+import {
+  PROTAGONIST_IDENTITY,
+  PROTAGONIST_STAY_STATUS,
+} from '../models/identity';
 import { storageService } from '../services/storage/storageService';
+import { ScreenDelay } from '../components/ui/ScreenDelay';
+import { PaperDocument } from '../components/paper/PaperDocument';
+import { FormInputField } from '../components/paper/FormInputField';
+import { IdentityCard } from '../components/paper/IdentityCard';
+import { StayPermitCard } from '../components/paper/StayPermitCard';
+import { GameBottomBar } from '../components/ui/GameBottomBar';
+import { TYPOGRAPHY } from '../theme/typography';
+import { moderateScale, scale, verticalScale } from '../utils/responsive';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OperatorRegistration'>;
 
 export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
-  // Estados de los campos del formulario
   const [fullName, setFullName] = useState('');
-  const [employeeCode, setEmployeeCode] = useState('');
-  const [emergencyContact, setEmergencyContact] = useState('');
-  const [isAgreed, setIsAgreed] = useState(false);
+  const [idNumber, setIdNumber] = useState('');
+  const [stayCode, setStayCode] = useState('');
+  const [citizenLevel, setCitizenLevel] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  // Estados de errores de validación
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [contactError, setContactError] = useState<string | null>(null);
-  const [agreementError, setAgreementError] = useState<string | null>(null);
-
-  // Validaciones en tiempo real
-  const validateName = (val: string): boolean => {
-    const trimmed = val.trim();
-    if (trimmed.length < 3) {
-      setNameError('ERROR: El nombre debe tener al menos 3 caracteres.');
-      return false;
-    }
-    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
-    if (!nameRegex.test(trimmed)) {
-      setNameError('ERROR: Caracteres inválidos. Solo letras y espacios.');
-      return false;
-    }
-    setNameError(null);
-    return true;
+  const handleAutoFill = () => {
+    setFullName(PROTAGONIST_IDENTITY.fullName);
+    setIdNumber(PROTAGONIST_IDENTITY.idNumber);
+    setStayCode(PROTAGONIST_STAY_STATUS.stayCode);
+    setCitizenLevel(PROTAGONIST_STAY_STATUS.citizenLevel);
+    Haptics.selectionAsync().catch(() => {});
   };
 
-  const validateCode = (val: string): boolean => {
-    const trimmed = val.trim().toUpperCase();
-    const codeRegex = /^CST-\d{4}$/;
-    if (!codeRegex.test(trimmed)) {
-      setCodeError('ERROR: El código debe cumplir el formato exacto CST-XXXX (ej. CST-4092).');
-      return false;
-    }
-    setCodeError(null);
-    return true;
+  // Validación diegética contra los documentos de la mesa
+  const isNameValid =
+    fullName.trim().toUpperCase() === PROTAGONIST_IDENTITY.fullName.toUpperCase();
+  const isIdValid =
+    idNumber.trim().toUpperCase() === PROTAGONIST_IDENTITY.idNumber.toUpperCase();
+  const isStayValid =
+    stayCode.trim().toUpperCase() === PROTAGONIST_STAY_STATUS.stayCode.toUpperCase();
+
+  // Validación flexible: acepta "3", "NIVEL 3", "NIVEL 3 [RESIDENTE]", etc.
+  const cleanLevel = citizenLevel.trim().toUpperCase();
+  const isLevelValid =
+    ['3', 'NIVEL 3', 'NIVEL 3 [RESIDENTE]', 'NIVEL 3 RESIDENTE'].includes(cleanLevel) ||
+    cleanLevel.replace(/[^0-9]/g, '') === '3';
+
+  const isFormComplete = isNameValid && isIdValid && isStayValid && isLevelValid;
+
+  /**
+   * TODO: Integrar expo-camera para capturar fotografía frontal del jugador
+   */
+  const handleCapturePhoto = async () => {
+    Haptics.selectionAsync().catch(() => {});
   };
 
-  const validateContact = (val: string): boolean => {
-    const trimmed = val.trim();
-    if (trimmed.length < 6) {
-      setContactError('ERROR: Contacto requerido (correo electrónico o teléfono).');
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[0-9+\-\s]{8,}$/;
-    if (!emailRegex.test(trimmed) && !phoneRegex.test(trimmed)) {
-      setContactError('ERROR: Ingrese un correo válido (usuario@dominio) o teléfono (mín. 8 dígitos).');
-      return false;
-    }
-    setContactError(null);
-    return true;
-  };
+  const handleConfirmRegistration = async () => {
+    if (!isFormComplete) return;
 
-  const handleSubmit = async () => {
-    const isNameValid = validateName(fullName);
-    const isCodeValid = validateCode(employeeCode);
-    const isContactValid = validateContact(emergencyContact);
-
-    let isAgreementValid = true;
-    if (!isAgreed) {
-      setAgreementError('ERROR OBLIGATORIO: Debe certificar y aceptar la cláusula de riesgo C.S.T.');
-      isAgreementValid = false;
-    } else {
-      setAgreementError(null);
-    }
-
-    if (!isNameValid || !isCodeValid || !isContactValid || !isAgreementValid) {
-      try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } catch {}
-      return;
-    }
-
-    // Datos válidos: Guardar en AsyncStorage
     try {
       await storageService.saveOperatorProfile({
+        identity: {
+          ...PROTAGONIST_IDENTITY,
+          fullName: fullName.trim(),
+          idNumber: idNumber.trim(),
+          photoUri,
+        },
+        stayStatus: {
+          ...PROTAGONIST_STAY_STATUS,
+          stayCode: stayCode.trim(),
+          citizenLevel: citizenLevel.trim(),
+        },
         fullName: fullName.trim(),
-        employeeCode: employeeCode.trim().toUpperCase(),
-        emergencyContact: emergencyContact.trim(),
-        sectorAssigned: 'SECTOR 4 - GARITA SUR',
         registeredAt: Date.now(),
       });
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    } catch (e) {
-      console.error('[OperatorRegistration] Error al persistir datos:', e);
-    }
 
-    // Continuar al flujo de la historia
-    navigation.navigate('WeeklyIntro', { weekNumber: 1 });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      navigation.navigate('WeeklyIntro', { weekNumber: 1 });
+    } catch (error) {
+      console.error('[Registration] Error al guardar perfil:', error);
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.keyboardContainer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+    <ScreenDelay delay={500} backgroundColor="#0C0C0C">
+      <View style={styles.screen}>
+        <StatusBar hidden />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ENCABEZADO OFICIAL CST */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerSub}>CONSORCIO INDUSTRIAL DE SUMINISTROS Y COMERCIO</Text>
-          <Text style={styles.headerTitle}>REGISTRO DE OPERADOR // SECTOR 4</Text>
-          <View style={styles.headerDivider} />
-          <Text style={styles.headerNotice}>
-            DECLARACIÓN JURADA DE ACCESO Y PROTOCOLO DE INSPECCIÓN FRONTERIZA
-          </Text>
-        </View>
+        {/* 1. MESA OSCURA: Colorbox de respaldo */}
+        <View style={styles.deskColorbox} />
 
-        {/* CAMPO 1: NOMBRE COMPLETO */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>
-            01. NOMBRE Y APELLIDO DEL OPERARIO <Text style={styles.requiredStar}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, nameError ? styles.inputError : null]}
-            placeholder="Ej. Miller, John"
-            placeholderTextColor={colors.textSubtle}
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              if (nameError) validateName(text);
-            }}
-            onBlur={() => validateName(fullName)}
-            autoCapitalize="words"
-            autoCorrect={false}
-          />
-          {nameError && <Text style={styles.errorText}>{nameError}</Text>}
-        </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardContainer}
+        >
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 2. HOJA DE REGISTRO C.S.T. (Deslizamiento frío sin rebote) */}
+            <PaperDocument style={styles.documentWrapper}>
+              <View style={styles.docHeader}>
+                <View style={styles.docHeaderRow}>
+                  <Text style={styles.docCompany}>CONSORCIO STRATTON-TATE // C.S.T.</Text>
+                  <TouchableOpacity
+                    onPress={handleAutoFill}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.autoFillBtn}>[ AUTO-RELLENAR ]</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.docTitle}>FORMULARIO 104-B: REGISTRO DE OPERARIO</Text>
+              </View>
 
-        {/* CAMPO 2: CÓDIGO DE CREDENCIAL */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>
-            02. CÓDIGO DE CREDENCIAL OFICIAL <Text style={styles.requiredStar}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, codeError ? styles.inputError : null]}
-            placeholder="Formato: CST-XXXX (Ej. CST-8041)"
-            placeholderTextColor={colors.textSubtle}
-            value={employeeCode}
-            onChangeText={(text) => {
-              setEmployeeCode(text.toUpperCase());
-              if (codeError) validateCode(text);
-            }}
-            onBlur={() => validateCode(employeeCode)}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={8}
-          />
-          {codeError && <Text style={styles.errorText}>{codeError}</Text>}
-        </View>
+              {/* Fila superior: Slot para foto + Cláusula inicial */}
+              <View style={styles.photoClauseRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleCapturePhoto}
+                  style={styles.photoBox}
+                >
+                  <Text style={styles.photoPlaceholderText}>[ FOTO 2x2 ]</Text>
+                  <Text style={styles.photoSubText}>TOCAR PARA CAPTURAR</Text>
+                </TouchableOpacity>
 
-        {/* CAMPO 3: CONTACTO DE EMERGENCIA */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>
-            03. CONTACTO DE EMERGENCIA / DEFUNCIÓN <Text style={styles.requiredStar}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, contactError ? styles.inputError : null]}
-            placeholder="correo@ejemplo.com o teléfono directo"
-            placeholderTextColor={colors.textSubtle}
-            value={emergencyContact}
-            onChangeText={(text) => {
-              setEmergencyContact(text);
-              if (contactError) validateContact(text);
-            }}
-            onBlur={() => validateContact(emergencyContact)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {contactError && <Text style={styles.errorText}>{contactError}</Text>}
-        </View>
+                <View style={styles.clauseContainer}>
+                  <Text style={styles.clauseText}>
+                    COPIE CON EXACTITUD LOS DATOS REGISTRADOS EN SU CREDENCIAL CIVIL.
+                    CUALQUIER DISCREPANCIA CONSTITUYE INFRACCIÓN CLASE B.
+                  </Text>
+                </View>
+              </View>
 
-        {/* CAMPO 4: CHECKBOX CLÁUSULA DE RESPONSABILIDAD */}
-        <TouchableOpacity
-          style={styles.agreementRow}
-          activeOpacity={0.7}
-          onPress={() => {
-            const nextVal = !isAgreed;
-            setIsAgreed(nextVal);
-            if (nextVal) setAgreementError(null);
+              {/* Campos interactivos del formulario */}
+              <FormInputField
+                label="1. NOMBRE COMPLETO:"
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="EJ: VANCE, JOHN E."
+                isValid={isNameValid}
+              />
+
+              <FormInputField
+                label="2. CÓDIGO DE IDENTIDAD CIVIL:"
+                value={idNumber}
+                onChangeText={setIdNumber}
+                placeholder="EJ: 941-20-8841"
+                isValid={isIdValid}
+              />
+
+              <FormInputField
+                label="3. CÓDIGO DE ESTADÍA AUTORIZADA:"
+                value={stayCode}
+                onChangeText={setStayCode}
+                placeholder="EJ: ST-4092-B"
+                isValid={isStayValid}
+              />
+
+              <FormInputField
+                label="4. NIVEL DE CIUDADANO (NIVEL O NÚMERO):"
+                value={citizenLevel}
+                onChangeText={setCitizenLevel}
+                placeholder="EJ: 3 O NIVEL 3"
+                isValid={isLevelValid}
+              />
+
+              <Text style={styles.docDisclaimer}>
+                CERTIFICO BAJO PENA DE RECLUSIÓN QUE LA INFORMACIÓN PROVISTA ES VERÍDICA.
+              </Text>
+            </PaperDocument>
+
+            {/* 3. DOCUMENTOS DE CONSULTA EN LA MESA (SUPERPUESTOS DIEGÉTICAMENTE) */}
+            <View style={styles.deskDocumentsArea}>
+              {/* Permiso de residencia y trabajo (a la izquierda y por debajo, zIndex: 1) */}
+              <View style={styles.permitLayer}>
+                <StayPermitCard
+                  stayStatus={PROTAGONIST_STAY_STATUS}
+                  identity={PROTAGONIST_IDENTITY}
+                />
+              </View>
+
+              {/* DNI (a la derecha y por encima, zIndex: 2, tapando datos repetidos) */}
+              <View style={styles.dniLayer}>
+                <IdentityCard identity={PROTAGONIST_IDENTITY} />
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        {/* 4. BARRA INFERIOR DE ACCIÓN (A la izquierda, ocupa todo el ancho) */}
+        <GameBottomBar
+          action={{
+            label: '[ VALIDAR Y FIRMAR ]',
+            onPress: handleConfirmRegistration,
+            disabled: !isFormComplete,
+            textAlign: 'left',
           }}
-        >
-          <View style={[styles.checkboxBox, isAgreed && styles.checkboxBoxChecked]}>
-            {isAgreed && <Text style={styles.checkmarkText}>✓</Text>}
-          </View>
-          <Text style={styles.agreementText}>
-            Certifico que he leído las directivas de seguridad. Exonero al Consorcio C.S.T.
-            de cualquier daño psicológico, paranoico o agresión física por entidades del exterior.
-          </Text>
-        </TouchableOpacity>
-        {agreementError && <Text style={styles.errorText}>{agreementError}</Text>}
-
-        {/* BOTÓN DE ENVÍO / FIRMA */}
-        <TouchableOpacity
-          style={styles.submitButton}
-          activeOpacity={0.8}
-          onPress={handleSubmit}
-        >
-          <Text style={styles.submitButtonText}>[ SELLAR Y ACCEDER AL SECTOR 4 ]</Text>
-        </TouchableOpacity>
-
-        {/* BOTÓN CANCELAR */}
-        <TouchableOpacity
-          style={styles.cancelButton}
-          activeOpacity={0.6}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.cancelButtonText}>&lt;&lt; CANCELAR Y RETORNAR AL MENÚ</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        />
+      </View>
+    </ScreenDelay>
   );
 };
 
 const styles = StyleSheet.create({
-  keyboardContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  screen: { flex: 1, backgroundColor: '#0C0C0C' },
+  deskColorbox: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0C0C0C' },
+  keyboardContainer: { flex: 1 },
+  scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: scale(24),
-    paddingVertical: verticalScale(40),
-    justifyContent: 'center',
+    paddingHorizontal: scale(16),
+    paddingTop: verticalScale(90),
+    paddingBottom: verticalScale(120),
   },
-  headerContainer: {
-    marginBottom: verticalScale(28),
-    alignItems: 'center',
-  },
-  headerSub: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    fontSize: moderateScale(9),
-    color: colors.textSubtle,
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  headerTitle: {
-    fontFamily: TYPOGRAPHY.stamps,
-    fontSize: moderateScale(16),
-    color: colors.crtAmber,
-    letterSpacing: 2,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  headerDivider: {
-    width: '100%',
-    height: 2,
-    backgroundColor: colors.stampRed,
-    marginVertical: verticalScale(8),
-  },
-  headerNotice: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(8),
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: verticalScale(12),
-  },
-  fieldContainer: {
-    marginBottom: verticalScale(16),
-  },
-  fieldLabel: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    fontSize: moderateScale(10),
-    color: '#e2e8f0',
-    marginBottom: verticalScale(6),
-    letterSpacing: 0.5,
-  },
-  requiredStar: {
-    color: colors.danger,
-    fontWeight: 'bold',
-  },
-  textInput: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 4,
-    color: colors.textPrimary,
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(12),
-    paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(10),
-  },
-  inputError: {
-    borderColor: colors.danger,
-    backgroundColor: 'rgba(230, 57, 70, 0.1)',
-  },
-  errorText: {
-    fontFamily: TYPOGRAPHY.systemPC,
-    fontSize: moderateScale(8.5),
-    color: '#f87171',
-    marginTop: 4,
-    letterSpacing: 0.3,
-  },
-  agreementRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: verticalScale(10),
-    marginBottom: verticalScale(8),
-    gap: scale(10),
-  },
-  checkboxBox: {
-    width: scale(22),
-    height: scale(22),
-    borderWidth: 2,
-    borderColor: colors.borderMedium,
-    borderRadius: 3,
-    backgroundColor: '#0f172a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  checkboxBoxChecked: {
-    borderColor: colors.crtGreen,
-    backgroundColor: 'rgba(0, 255, 102, 0.15)',
-  },
-  checkmarkText: {
-    color: colors.crtGreen,
-    fontSize: moderateScale(14),
-    fontWeight: 'bold',
-    lineHeight: moderateScale(16),
-  },
-  agreementText: {
-    flex: 1,
-    fontFamily: TYPOGRAPHY.dirtyDoc,
-    fontSize: moderateScale(8.5),
-    color: '#cbd5e1',
-    lineHeight: verticalScale(13),
-  },
-  submitButton: {
-    backgroundColor: '#991b1b',
-    borderWidth: 2,
-    borderColor: '#ef4444',
-    borderRadius: 6,
-    paddingVertical: verticalScale(14),
-    alignItems: 'center',
-    marginTop: verticalScale(20),
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-  },
-  submitButtonText: {
-    fontFamily: TYPOGRAPHY.stamps,
-    fontSize: moderateScale(12),
-    color: '#ffffff',
-    letterSpacing: 1.5,
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    marginTop: verticalScale(16),
-    alignItems: 'center',
-    paddingVertical: verticalScale(8),
-  },
-  cancelButtonText: {
-    fontFamily: TYPOGRAPHY.cleanDoc,
-    fontSize: moderateScale(9),
-    color: colors.textMuted,
-    letterSpacing: 1,
-  },
+  documentWrapper: { marginBottom: verticalScale(28) },
+  docHeader: { borderBottomWidth: 1.5, borderBottomColor: '#2E86C1', paddingBottom: verticalScale(6), marginBottom: verticalScale(10) },
+  docHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  autoFillBtn: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(9), color: '#2E86C1', letterSpacing: 0.5 },
+  docCompany: { fontFamily: TYPOGRAPHY.stamps, fontSize: moderateScale(11), color: '#2E86C1', letterSpacing: 1 },
+  docTitle: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(9), color: '#3B3322', letterSpacing: 0.5, marginTop: verticalScale(2) },
+  photoClauseRow: { flexDirection: 'row', gap: scale(10), marginBottom: verticalScale(10), alignItems: 'center' },
+  photoBox: { width: scale(72), height: verticalScale(86), borderWidth: 1.5, borderColor: '#8A7A60', borderStyle: 'dashed', backgroundColor: 'rgba(255, 255, 255, 0.2)', justifyContent: 'center', alignItems: 'center', padding: scale(4) },
+  photoPlaceholderText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(8), color: '#5C5346', textAlign: 'center' },
+  photoSubText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(6.5), color: '#786E5E', textAlign: 'center', marginTop: verticalScale(4) },
+  clauseContainer: { flex: 1 },
+  clauseText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(8.5), color: '#443E33', lineHeight: verticalScale(13) },
+  docDisclaimer: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(7.5), color: '#6E6454', textAlign: 'center', marginTop: verticalScale(6), letterSpacing: 0.3 },
+  deskDocumentsArea: { position: 'relative', height: verticalScale(195), marginTop: verticalScale(8), marginBottom: verticalScale(20) },
+  permitLayer: { position: 'absolute', left: scale(2), top: 0, zIndex: 1, transform: [{ rotate: '-2.8deg' }] },
+  dniLayer: { position: 'absolute', right: scale(2), top: verticalScale(32), zIndex: 2, transform: [{ rotate: '2.2deg' }] },
 });

@@ -1,11 +1,16 @@
 // src/models/save.ts
+import { IPersonIdentity, ICitizenStayStatus } from './identity';
 
 export interface IOperatorProfile {
-  fullName: string;
-  employeeCode: string;
-  emergencyContact: string;
-  sectorAssigned: string;
+  identity?: IPersonIdentity;
+  stayStatus?: ICitizenStayStatus;
+  /** Timestamp de registro de la partida */
   registeredAt: number;
+  /** Campos de compatibilidad previa */
+  fullName?: string;
+  employeeCode?: string;
+  emergencyContact?: string;
+  sectorAssigned?: string;
 }
 
 export interface ISaveGameSchema {

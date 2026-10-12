@@ -7,6 +7,11 @@
  * pantallas digitales y manuscritos anómalos de "ISN'T BEHIND".
  */
 export const TYPOGRAPHY = {
+  // 0. MENÚ PRINCIPAL (Título + opciones de navegación pre-juego)
+  menuTitle: 'BebasNeue-Regular',    // "ISN'T BEHIND" — publicidad corporativa brutalista
+  menuOption: 'Inconsolata-Light',   // Opciones del menú, estilo consola
+  menuOptionBold: 'Inconsolata-Bold', // Opción activa / presionada
+
   // 1. SISTEMA OPERATIVO & TERMINAL CRT
   systemPC: 'Inconsolata-Light',
 
