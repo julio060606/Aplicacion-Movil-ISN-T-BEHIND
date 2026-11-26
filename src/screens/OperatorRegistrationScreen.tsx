@@ -1,6 +1,7 @@
 // src/screens/OperatorRegistrationScreen.tsx
 import React, { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,12 +19,14 @@ import {
   PROTAGONIST_STAY_STATUS,
 } from '../models/identity';
 import { storageService } from '../services/storage/storageService';
+import { loggerService } from '../services/logging/loggerService';
 import { ScreenDelay } from '../components/ui/ScreenDelay';
 import { PaperDocument } from '../components/paper/PaperDocument';
 import { FormInputField } from '../components/paper/FormInputField';
 import { IdentityCard } from '../components/paper/IdentityCard';
 import { StayPermitCard } from '../components/paper/StayPermitCard';
 import { GameBottomBar } from '../components/ui/GameBottomBar';
+import { OperatorCameraModal } from '../components/camera/OperatorCameraModal';
 import { TYPOGRAPHY } from '../theme/typography';
 import { moderateScale, scale, verticalScale } from '../utils/responsive';
 
@@ -35,6 +38,7 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const [stayCode, setStayCode] = useState('');
   const [citizenLevel, setCitizenLevel] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
   const handleAutoFill = () => {
     setFullName(PROTAGONIST_IDENTITY.fullName);
@@ -44,7 +48,6 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     Haptics.selectionAsync().catch(() => {});
   };
 
-  // Validación diegética contra los documentos de la mesa
   const isNameValid =
     fullName.trim().toUpperCase() === PROTAGONIST_IDENTITY.fullName.toUpperCase();
   const isIdValid =
@@ -52,7 +55,6 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const isStayValid =
     stayCode.trim().toUpperCase() === PROTAGONIST_STAY_STATUS.stayCode.toUpperCase();
 
-  // Validación flexible: acepta "3", "NIVEL 3", "NIVEL 3 [RESIDENTE]", etc.
   const cleanLevel = citizenLevel.trim().toUpperCase();
   const isLevelValid =
     ['3', 'NIVEL 3', 'NIVEL 3 [RESIDENTE]', 'NIVEL 3 RESIDENTE'].includes(cleanLevel) ||
@@ -60,11 +62,9 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
 
   const isFormComplete = isNameValid && isIdValid && isStayValid && isLevelValid;
 
-  /**
-   * TODO: Integrar expo-camera para capturar fotografía frontal del jugador
-   */
-  const handleCapturePhoto = async () => {
+  const handleCapturePhoto = () => {
     Haptics.selectionAsync().catch(() => {});
+    setCameraVisible(true);
   };
 
   const handleConfirmRegistration = async () => {
@@ -87,8 +87,15 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         registeredAt: Date.now(),
       });
 
+      loggerService.log(
+        'INFO',
+        'STORAGE',
+        'Perfil de operario guardado en AsyncStorage',
+        `Titular: ${fullName.trim()} // Foto: ${photoUri ? 'ADJUNTA' : 'PENDIENTE'}`
+      );
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      navigation.navigate('WeeklyIntro', { weekNumber: 1 });
+      navigation.navigate('DailyIntro', { dayNumber: 1 });
     } catch (error) {
       console.error('[Registration] Error al guardar perfil:', error);
     }
@@ -99,7 +106,6 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.screen}>
         <StatusBar hidden />
 
-        {/* 1. MESA OSCURA: Colorbox de respaldo */}
         <View style={styles.deskColorbox} />
 
         <KeyboardAvoidingView
@@ -111,7 +117,7 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* 2. HOJA DE REGISTRO C.S.T. (Deslizamiento frío sin rebote) */}
+            {/* HOJA DE REGISTRO C.S.T. */}
             <PaperDocument style={styles.documentWrapper}>
               <View style={styles.docHeader}>
                 <View style={styles.docHeaderRow}>
@@ -127,15 +133,27 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.docTitle}>FORMULARIO 104-B: REGISTRO DE OPERARIO</Text>
               </View>
 
-              {/* Fila superior: Slot para foto + Cláusula inicial */}
+              {/* Fila superior: Slot para foto con botón de captura / reintentar */}
               <View style={styles.photoClauseRow}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={handleCapturePhoto}
                   style={styles.photoBox}
                 >
-                  <Text style={styles.photoPlaceholderText}>[ FOTO 2x2 ]</Text>
-                  <Text style={styles.photoSubText}>TOCAR PARA CAPTURAR</Text>
+                  {photoUri ? (
+                    <View style={styles.photoPreviewWrapper}>
+                      <Image source={{ uri: photoUri }} style={styles.capturedPhoto} resizeMode="cover" />
+                      <View style={styles.retakeBadge}>
+                        <Text style={styles.retakeBadgeText}>[ ↻ REINTENTAR ]</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.photoIcon}>👤</Text>
+                      <Text style={styles.photoPlaceholderText}>[ FOTO 2x2 ]</Text>
+                      <Text style={styles.photoSubText}>TOCAR PARA CAPTURAR</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 <View style={styles.clauseContainer}>
@@ -184,9 +202,8 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
             </PaperDocument>
 
-            {/* 3. DOCUMENTOS DE CONSULTA EN LA MESA (SUPERPUESTOS DIEGÉTICAMENTE) */}
+            {/* DOCUMENTOS DE CONSULTA EN LA MESA */}
             <View style={styles.deskDocumentsArea}>
-              {/* Permiso de residencia y trabajo (a la izquierda y por debajo, zIndex: 1) */}
               <View style={styles.permitLayer}>
                 <StayPermitCard
                   stayStatus={PROTAGONIST_STAY_STATUS}
@@ -194,15 +211,14 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
                 />
               </View>
 
-              {/* DNI (a la derecha y por encima, zIndex: 2, tapando datos repetidos) */}
               <View style={styles.dniLayer}>
-                <IdentityCard identity={PROTAGONIST_IDENTITY} />
+                <IdentityCard identity={{ ...PROTAGONIST_IDENTITY, photoUri }} />
               </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* 4. BARRA INFERIOR DE ACCIÓN (A la izquierda, ocupa todo el ancho) */}
+        {/* BARRA INFERIOR DE ACCIÓN */}
         <GameBottomBar
           action={{
             label: '[ VALIDAR Y FIRMAR ]',
@@ -210,6 +226,13 @@ export const OperatorRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             disabled: !isFormComplete,
             textAlign: 'left',
           }}
+        />
+
+        {/* MODAL DIEGÉTICO DE CÁMARA */}
+        <OperatorCameraModal
+          visible={cameraVisible}
+          onClose={() => setCameraVisible(false)}
+          onPhotoCaptured={(uri) => setPhotoUri(uri)}
         />
       </View>
     </ScreenDelay>
@@ -223,8 +246,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: scale(16),
-    paddingTop: verticalScale(90),
-    paddingBottom: verticalScale(120),
+    paddingTop: verticalScale(20),
+    paddingBottom: verticalScale(60),
   },
   documentWrapper: { marginBottom: verticalScale(28) },
   docHeader: { borderBottomWidth: 1.5, borderBottomColor: '#2E86C1', paddingBottom: verticalScale(6), marginBottom: verticalScale(10) },
@@ -233,9 +256,38 @@ const styles = StyleSheet.create({
   docCompany: { fontFamily: TYPOGRAPHY.stamps, fontSize: moderateScale(11), color: '#2E86C1', letterSpacing: 1 },
   docTitle: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(9), color: '#3B3322', letterSpacing: 0.5, marginTop: verticalScale(2) },
   photoClauseRow: { flexDirection: 'row', gap: scale(10), marginBottom: verticalScale(10), alignItems: 'center' },
-  photoBox: { width: scale(72), height: verticalScale(86), borderWidth: 1.5, borderColor: '#8A7A60', borderStyle: 'dashed', backgroundColor: 'rgba(255, 255, 255, 0.2)', justifyContent: 'center', alignItems: 'center', padding: scale(4) },
+  photoBox: {
+    width: scale(72),
+    height: verticalScale(86),
+    borderWidth: 1.5,
+    borderColor: '#8A7A60',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: scale(2),
+    overflow: 'hidden',
+  },
+  photoIcon: { fontSize: moderateScale(18), marginBottom: verticalScale(2) },
   photoPlaceholderText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(8), color: '#5C5346', textAlign: 'center' },
-  photoSubText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(6.5), color: '#786E5E', textAlign: 'center', marginTop: verticalScale(4) },
+  photoSubText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(6.5), color: '#786E5E', textAlign: 'center', marginTop: verticalScale(2) },
+  photoPreviewWrapper: { width: '100%', height: '100%', position: 'relative' },
+  capturedPhoto: { width: '100%', height: '100%' },
+  retakeBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(7, 12, 20, 0.85)',
+    paddingVertical: verticalScale(2),
+    alignItems: 'center',
+  },
+  retakeBadgeText: {
+    fontFamily: TYPOGRAPHY.systemPC,
+    fontSize: moderateScale(6),
+    color: '#38BDF8',
+    fontWeight: 'bold',
+  },
   clauseContainer: { flex: 1 },
   clauseText: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(8.5), color: '#443E33', lineHeight: verticalScale(13) },
   docDisclaimer: { fontFamily: TYPOGRAPHY.cleanDoc, fontSize: moderateScale(7.5), color: '#6E6454', textAlign: 'center', marginTop: verticalScale(6), letterSpacing: 0.3 },

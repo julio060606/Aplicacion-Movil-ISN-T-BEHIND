@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0C0C0C', // Fondo 0C0C0C solicitado
     paddingHorizontal: scale(18),
-    paddingTop: verticalScale(170), // Subido moderadamente para dejar espacio abajo
-    paddingBottom: verticalScale(60),
+    paddingTop: verticalScale(14), // Ajustado para evitar desbordamiento
+    paddingBottom: verticalScale(50),
     justifyContent: 'space-between',
   },
   terminalContent: {

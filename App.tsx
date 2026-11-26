@@ -10,6 +10,7 @@ import { FontProvider } from './src/components/core/FontProvider';
 import { MenuThemeProvider } from './src/context/MenuThemeContext';
 
 // 2. Pantallas del menú principal y pre-juego
+import { PrototypeIntroScreen } from './src/screens/PrototypeIntroScreen';
 import { MenuDrawerNavigator } from './src/navigation/MenuDrawerNavigator';
 import { MainMenuScreen } from './src/screens/MainMenuScreen';
 import { StorySaveSelectScreen } from './src/screens/StorySaveSelectScreen';
@@ -18,7 +19,6 @@ import { ExtrasScreen } from './src/screens/ExtrasScreen';
 
 // 3. Pantallas de flujo de juego
 import { OperatorRegistrationScreen } from './src/screens/OperatorRegistrationScreen';
-import { WeeklyIntroScreen } from './src/screens/WeeklyIntroScreen';
 import { DailyIntroScreen } from './src/screens/DailyIntroScreen';
 import { ShiftScreen } from './src/screens/ShiftScreen';
 
@@ -38,14 +38,18 @@ const RootNavigation = () => {
         }}
       >
         <Stack.Navigator
-          initialRouteName="MenuDrawer"
+          initialRouteName="PrototypeIntro"
           screenOptions={{
             headerShown: false,
             animation: 'none',
+            orientation: 'portrait',
             contentStyle: { backgroundColor: '#0C0C0C' },
           }}
         >
-          {/* ── DRAWER RAÍZ (menú lateral, pantalla inicial) ── */}
+          {/* ── AVISO INICIAL DE PROTOTIPO ACADÉMICO ── */}
+          <Stack.Screen name="PrototypeIntro" component={PrototypeIntroScreen} />
+
+          {/* ── DRAWER RAÍZ (menú lateral, pantalla principal) ── */}
           <Stack.Screen name="MenuDrawer" component={MenuDrawerNavigator} />
 
           {/* ── PRE-JUEGO: MENÚ Y SUBPANTALLAS ── */}
@@ -56,10 +60,17 @@ const RootNavigation = () => {
 
           {/* ── FLUJO DE JUEGO ── */}
           <Stack.Screen name="OperatorRegistration" component={OperatorRegistrationScreen} />
-          <Stack.Screen name="WeeklyIntro" component={WeeklyIntroScreen} />
           <Stack.Screen name="DailyIntro" component={DailyIntroScreen} />
-          <Stack.Screen name="GameInterface" component={ShiftScreen} />
-          <Stack.Screen name="Shift" component={ShiftScreen} />
+          <Stack.Screen
+            name="GameInterface"
+            component={ShiftScreen}
+            options={{ orientation: 'landscape' }}
+          />
+          <Stack.Screen
+            name="Shift"
+            component={ShiftScreen}
+            options={{ orientation: 'landscape' }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </View>

@@ -1,6 +1,6 @@
 # STATUS — ISN'T BEHIND
 > **Documento vivo.** Se actualiza al inicio y al final de cada sesión de trabajo.  
-> **Última actualización:** 2026-09-21 (Refactorización Modular Completa — Fases 0, 1, 2, 3 y 4 Finalizadas)
+> **Última actualización:** 2026-11-12 (Transición a Landscape 1049 × 484 px — Limpieza de Gameplay Antiguo)
 
 ---
 
@@ -8,11 +8,10 @@
 
 | Aspecto | Estado | Notas |
 |---|---|---|
-| **Compilación** | ✅ Compila limpio | Sin errores de TypeScript. `ViewStyle` y `camera` styles arreglados. |
-| **Pantalla principal (`ShiftScreen`)** | ✅ Orquestador Puro | Reducido de 1324 líneas a ~390 líneas. Cero lógica de negocio, cero px hardcodeados. |
-| **Motor de turno (`useTurnEngine`)** | ✅ Dominio Puro | `IShiftState`, strikes, reloj in-game 12:00-00:00, píldora CST. Cero `useState` de UI. |
-| **Hooks Especializados** | ✅ Implementados | `useDrawers.ts`, `useOverlays.ts`, `useSceneCamera.ts`. |
-| **Registro de escena (`sceneConfig.ts`)** | ✅ SSoT Completa | Matriz de Figma con `OFFSET_X=619, OFFSET_Y=239`, `panConfig`, `drawerConfig`. |
+| **Compilación** | ✅ Compila limpio | Sin errores de TypeScript. Sprites antiguos desacoplados. |
+| **Pantalla principal (`ShiftScreen`)** | 📐 Calibración Horizontal | Configurado en 1049 × 484 px con escala adaptativa y sectores 40% / 60%. |
+| **Lienzo de Diseño (`viewportConfig.ts`)** | 🔄 Actualizado | Ancho: 1049 px, Alto: 484 px. Orientación landscape oficial. |
+| **Registro de escena (`sceneConfig.ts`)** | 🧹 Limpio | Diccionario de sprites purgado de assets antiguos. |
 | **Renderizador Atómico (`GameSprite.tsx`)** | ✅ Operativo | Aplica la fórmula `(figma - offset) * scale`. Soporta imágenes, animaciones y sombras. |
 | **Limpieza de Residuos (Zombies)** | ✅ Completada | Eliminados `useShiftEngine.ts`, `components/shift/` (10 archivos), `AssetContext.tsx`, `assets.ts` y `core/`. |
 | **Documentación** | ✅ Fase 4 Completa | Todos los 4 pilares + Contexto Maestro + Status alineados con la nueva arquitectura. |
@@ -104,3 +103,25 @@
 - **Persistencia en AsyncStorage:** Gestión de caché de red (`@cst_cached_dispatches`), perfiles de operador (`@isnt_behind_operator_profile`) y preferencias de tema (`@isnt_behind_menu_theme`).
 - **Leyes de Ingeniería:** Todos los componentes por debajo de 300 líneas (Ley T5), TypeScript estricto sin `any`, y estética retro-brutalista preservada.
 - **Documento Académico:** Creado `docs/05-avance-2-academic.md` con la matriz de trazabilidad y guía de evaluación.
+
+---
+
+**Sesión:** 2026-11-13  
+**Tareas completadas (Unidad 3 / Avance de Proyecto Final 03 del Sílabo Académico — APF3):**
+- **Semana 11 & 13 (Cámara Frontal y Solicitud de Permisos):**
+  - Integrado `expo-camera` oficial.
+  - `OperatorCameraModal.tsx`: Captura frontal (`facing="front"`), retícula diegética biométrica y validación formal con `useCameraPermissions`.
+  - `OperatorRegistrationScreen.tsx`: Botón `[ ↻ REINTENTAR ]` en la silueta de foto 2x2, reflejado dinámicamente en el DNI de la mesa.
+- **Semana 12 & 13 (Acelerómetro y Sensores de Hardware):**
+  - `useDeviceTilt.ts`: Hook con `expo-sensors` y filtro de paso bajo (inercia cinemática).
+  - Ciclo de vida estricto: Acelerómetro solo se activa cuando un slot está en mano; al enfundar o pausar la suscripción se destruye inmediatamente.
+  - `InHandToolOverlay.tsx`: Render de la mano del operario con la herramienta activa en primer plano.
+  - Proyección de Linterna UV: Inclinando el dispositivo se mueve el haz de luz sobre la mesa, revelando sellos fluorescentes ocultos en `DniCardVectorial.tsx`.
+- **Semana 14 (Notificaciones Push y Locales):**
+  - `notificationService.ts`: Integrado `expo-notifications` con canal Android de alta prioridad (`cst-security-channel`).
+  - Alerta de abandono de puesto al mandar la app a segundo plano (`AppState === 'background'`).
+  - Botón diegético de prueba directa en el menú de pausa (`ShiftPauseModal.tsx`).
+- **Semana 15 (Optimización, Manejo de Errores y Logging):**
+  - `loggerService.ts`: Registro centralizado de eventos y diagnósticos de hardware (`CAMERA`, `SENSORS`, `NOTIFICATIONS`, `STORAGE`, `CORE`) con persistencia en `AsyncStorage`.
+  - `HardwareSystemLogsViewer.tsx`: Visualizador en vivo embebido en `NetworkTerminalTab.tsx` en `DossierScreen.tsx` con filtros reactivos.
+- **Leyes de Ingeniería (Ley T5):** Todos los componentes y hooks creados y refactorizados se mantienen rigurosamente por debajo del límite de 300 líneas.

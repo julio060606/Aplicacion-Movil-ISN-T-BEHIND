@@ -22,7 +22,7 @@ export const DailyIntroScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenDelay delay={500} backgroundColor="#0C0C0C">
+    <ScreenDelay delay={1500} backgroundColor="#0C0C0C" loadingText="[ CONECTANDO CON FRECUENCIA C.S.T. // PORTWALL ]">
       <View style={styles.screen}>
         <StatusBar hidden />
 

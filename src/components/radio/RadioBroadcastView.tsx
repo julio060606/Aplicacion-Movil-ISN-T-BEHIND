@@ -22,14 +22,15 @@ const FONT_HIGHLIGHT = TYPOGRAPHY.menuOptionBold; // 'Inconsolata-Bold'
 interface RadioBroadcastViewProps {
   pages: string[];
   dayNumber: number;
-  radioSprite?: ImageSourcePropType;
+  /** Imagen a lo largo opcional; si no se envía, el espacio queda vacío */
+  imageSource?: ImageSourcePropType;
   onStartShift: () => void;
 }
 
 export const RadioBroadcastView: React.FC<RadioBroadcastViewProps> = ({
   pages,
   dayNumber,
-  radioSprite,
+  imageSource,
   onStartShift,
 }) => {
   const [pageIndex, setPageIndex] = useState(0);
@@ -97,73 +98,65 @@ export const RadioBroadcastView: React.FC<RadioBroadcastViewProps> = ({
   return (
     <TouchableWithoutFeedback onPress={handleSkip}>
       <View style={styles.container}>
-        {/* 1. BLOQUE DE TEXTO EN EL CENTRO (Espacio superior e inferior libres) */}
-        <View style={styles.centerBlock}>
-          <View style={styles.textContainer}>
-            <Text style={styles.bodyText}>
-              {displayedText}
-              {isTyping && <Text style={styles.cursor}>_</Text>}
-            </Text>
-          </View>
-
-          {/* Paginación discreta (< PAG X/Y >) */}
-          <View style={styles.paginationRow}>
-            {pageIndex > 0 ? (
-              <TouchableOpacity
-                onPress={handlePrevPage}
-                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-              >
-                <Text style={styles.navArrow}>&lt; ANTERIOR</Text>
-              </TouchableOpacity>
+        {/* FILA PRINCIPAL: Imagen vertical a la izquierda + Texto a la derecha */}
+        <View style={styles.contentRow}>
+          {/* 1. IMAGEN A LO LARGO (Izquierda, vacía si no hay imagen provista) */}
+          <View style={styles.imageColumn}>
+            {imageSource ? (
+              <Image
+                source={imageSource}
+                style={styles.tallImage}
+                resizeMode="cover"
+              />
             ) : (
-              <View style={styles.navPlaceholder} />
-            )}
-
-            <Text style={styles.pageCounter}>
-              [ PAG {pageIndex + 1}/{pages.length} ]
-            </Text>
-
-            {!isLastPage ? (
-              <TouchableOpacity
-                onPress={handleNextPage}
-                disabled={isTyping}
-                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-              >
-                <Text style={[styles.navArrow, isTyping && styles.navArrowDisabled]}>
-                  SIGUIENTE &gt;
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.navPlaceholder} />
+              <View style={styles.emptyImageSlot} />
             )}
           </View>
-        </View>
 
-        {/* 2. RADIO ESTÁTICA (Sin animación, fijada más abajo a la derecha) */}
-        <View style={styles.radioStaticArea} pointerEvents="none">
-          <View style={styles.radioBox}>
-            {/* Colorbox de respaldo */}
-            <View style={styles.radioColorbox}>
-              <View style={styles.speakerGrill}>
-                <View style={styles.grillLine} />
-                <View style={styles.grillLine} />
-                <View style={styles.grillLine} />
-              </View>
-              <View style={styles.dialKnob} />
+          {/* 2. TEXTO Y PAGINACIÓN (Derecha) */}
+          <View style={styles.textColumn}>
+            <View style={styles.textContainer}>
+              <Text style={styles.bodyText}>
+                {displayedText}
+                {isTyping && <Text style={styles.cursor}>_</Text>}
+              </Text>
             </View>
 
-            {/* Sprite oficial si está disponible */}
-            {radioSprite && (
-              <Image
-                source={radioSprite}
-                style={StyleSheet.absoluteFill}
-                resizeMode="contain"
-              />
-            )}
+            {/* Paginación (< PAG X/Y >) */}
+            <View style={styles.paginationRow}>
+              {pageIndex > 0 ? (
+                <TouchableOpacity
+                  onPress={handlePrevPage}
+                  hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+                >
+                  <Text style={styles.navArrow}>&lt; ANTERIOR</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.navPlaceholder} />
+              )}
+
+              <Text style={styles.pageCounter}>
+                [ PAG {pageIndex + 1}/{pages.length} ]
+              </Text>
+
+              {!isLastPage ? (
+                <TouchableOpacity
+                  onPress={handleNextPage}
+                  disabled={isTyping}
+                  hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+                >
+                  <Text style={[styles.navArrow, isTyping && styles.navArrowDisabled]}>
+                    SIGUIENTE &gt;
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.navPlaceholder} />
+              )}
+            </View>
           </View>
         </View>
 
-        {/* 3. TAB INFERIOR: TRABAJAR */}
+        {/* 3. BARRA INFERIOR DE ACCIÓN: TRABAJAR */}
         <GameBottomBar
           action={{
             label: '[ TRABAJAR ]',
@@ -180,25 +173,52 @@ export const RadioBroadcastView: React.FC<RadioBroadcastViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0C0C0C', // Fondo permanente 0C0C0C
-    paddingHorizontal: scale(20),
+    backgroundColor: '#0C0C0C',
+    paddingHorizontal: scale(16),
     paddingBottom: verticalScale(60),
-    justifyContent: 'center', // Centrado verticalmente
-  },
-  centerBlock: {
     justifyContent: 'center',
-    paddingBottom: verticalScale(90), // Deja espacio libre para la radio abajo
+  },
+  contentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: scale(14),
+    alignItems: 'center',
+    paddingBottom: verticalScale(45),
+    paddingTop: verticalScale(16),
+  },
+  imageColumn: {
+    flex: 0.9,
+    height: '80%',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  tallImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  emptyImageSlot: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F1318',
+    borderWidth: 1,
+    borderColor: '#1E2631',
+    borderStyle: 'dashed',
+  },
+  textColumn: {
+    flex: 1.1,
+    justifyContent: 'center',
   },
   textContainer: {
-    minHeight: verticalScale(130),
+    minHeight: verticalScale(120),
+    justifyContent: 'center',
   },
   bodyText: {
     fontFamily: FONT_BASE,
-    fontSize: moderateScale(15),
-    color: '#E0E7EC', // Blanco sutil legible
-    lineHeight: verticalScale(23),
+    fontSize: moderateScale(13.5),
+    color: '#E0E7EC',
+    lineHeight: verticalScale(21),
     letterSpacing: 0.8,
-    textTransform: 'uppercase', // Formato mayúsculas como en el formulario
+    textTransform: 'uppercase',
   },
   cursor: {
     color: colors.menuTheme.dark.accent,
@@ -215,9 +235,9 @@ const styles = StyleSheet.create({
   },
   navArrow: {
     fontFamily: FONT_HIGHLIGHT,
-    fontSize: moderateScale(13),
+    fontSize: moderateScale(11.5),
     color: '#94A3B8',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   navArrowDisabled: {
@@ -225,51 +245,11 @@ const styles = StyleSheet.create({
   },
   pageCounter: {
     fontFamily: FONT_BASE,
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(11),
     color: '#666666',
     letterSpacing: 1,
   },
   navPlaceholder: {
-    width: scale(70),
-  },
-  // Radio estática anclada a la derecha, más abajo pero despegada del tab
-  radioStaticArea: {
-    position: 'absolute',
-    bottom: verticalScale(95),
-    right: scale(20),
-  },
-  radioBox: {
-    width: scale(155),
-    height: verticalScale(105),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioColorbox: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: '#1E242B',
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 5,
-    padding: scale(10),
-    justifyContent: 'space-between',
-  },
-  speakerGrill: {
-    flex: 1,
-    justifyContent: 'space-around',
-    paddingVertical: verticalScale(4),
-  },
-  grillLine: {
-    height: 2.5,
-    backgroundColor: '#0F172A',
-    borderRadius: 2,
-  },
-  dialKnob: {
-    width: scale(18),
-    height: scale(18),
-    borderRadius: scale(9),
-    backgroundColor: '#334155',
-    borderWidth: 1,
-    borderColor: '#64748B',
-    alignSelf: 'flex-end',
+    width: scale(60),
   },
 });

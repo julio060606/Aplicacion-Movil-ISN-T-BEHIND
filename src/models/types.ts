@@ -37,6 +37,7 @@ export type MenuDrawerParamList = {
  * Parámetros fuertemente tipados para la pila de navegación principal (Stack)
  */
 export type RootStackParamList = {
+  PrototypeIntro: undefined;
   MenuDrawer: undefined;
   MainMenu: undefined;
   OperatorRegistration: undefined;

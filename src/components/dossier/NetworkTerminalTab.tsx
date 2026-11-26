@@ -12,13 +12,16 @@ import {
 import * as Haptics from 'expo-haptics';
 import { cstNetworkService, IPortwallWeather } from '../../services/api/cstNetworkService';
 import { ICstDispatch } from '../../constants/localDispatches';
+import { HardwareSystemLogsViewer } from './HardwareSystemLogsViewer';
 import { colors } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { moderateScale, scale, verticalScale } from '../../utils/responsive';
 
 type FilterType = 'ALL' | 'CLOUD' | 'CACHE' | 'LOCAL';
+type SubTabType = 'DISPATCHES' | 'HARDWARE_LOGS';
 
 export const NetworkTerminalTab: React.FC = () => {
+  const [subTab, setSubTab] = useState<SubTabType>('DISPATCHES');
   const [dispatches, setDispatches] = useState<ICstDispatch[]>([]);
   const [weather, setWeather] = useState<IPortwallWeather | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -108,102 +111,132 @@ export const NetworkTerminalTab: React.FC = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Telemetría climática Open-Meteo */}
-      <View style={styles.weatherCard}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.weatherTitle}>TELEMETRÍA ATMOSFÉRICA // PORTWALL</Text>
-          <Text style={[styles.statusBadge, { color: weather?.isOnline ? colors.crtGreen : '#f59e0b' }]}>
-            {weather?.isOnline ? '● EN LÍNEA' : '▲ MODO LOCAL'}
+      {/* Selector de sub-pantalla */}
+      <View style={styles.subTabRow}>
+        <TouchableOpacity
+          style={[styles.subTabBtn, subTab === 'DISPATCHES' && styles.subTabBtnActive]}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setSubTab('DISPATCHES');
+          }}
+        >
+          <Text style={[styles.subTabBtnText, subTab === 'DISPATCHES' && styles.subTabBtnTextActive]}>
+            [ 📡 COMUNICADOS DE RED ]
           </Text>
-        </View>
-        <Text style={styles.weatherTemp}>
-          {weather ? `${weather.temperature}°C` : '--.-°C'}
-          <Text style={styles.weatherCondition}> | {weather?.condition || 'CALIBRANDO...'}</Text>
-        </Text>
-        <Text style={styles.weatherSub}>Viento: {weather?.windspeed ?? '--'} km/h | Satélite C.S.T. Nodo-4</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.subTabBtn, subTab === 'HARDWARE_LOGS' && styles.subTabBtnActive]}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setSubTab('HARDWARE_LOGS');
+          }}
+        >
+          <Text style={[styles.subTabBtnText, subTab === 'HARDWARE_LOGS' && styles.subTabBtnTextActive]}>
+            [ 🛠 HARDWARE & LOGS ]
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Matriz de almacenamiento */}
-      <View style={styles.matrixBox}>
-        <Text style={styles.sectionHeading}>ARQUITECTURA DE ALMACENAMIENTO</Text>
-        <Text style={styles.matrixCaption}>Caché en AsyncStorage: {cacheCount} registros</Text>
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity style={styles.btnAction} onPress={loadCloudData}>
-            <Text style={styles.btnActionText}>[ ↻ SYNC NUBE ]</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnAction} onPress={handleSaveToCache}>
-            <Text style={styles.btnActionText}>[ 💾 CACHEAR ]</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnAction} onPress={handleLoadFromCache}>
-            <Text style={styles.btnActionText}>[ 📂 CARGAR CACHÉ ]</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnAction} onPress={handleLoadLocalFallback}>
-            <Text style={styles.btnActionText}>[ ⚡ FORZAR LOCAL ]</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filtros y búsqueda */}
-      <View style={styles.searchSection}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="BUSCAR EN COMUNICADOS POR PALABRA O SECTOR..."
-          placeholderTextColor="#475569"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="characters"
-        />
-        <View style={styles.filterTabs}>
-          {(['ALL', 'CLOUD', 'CACHE', 'LOCAL'] as FilterType[]).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.filterChip, activeFilter === tab && styles.filterChipActive]}
-              onPress={() => setActiveFilter(tab)}
-            >
-              <Text style={[styles.filterChipText, activeFilter === tab && styles.filterChipTextActive]}>
-                {tab === 'ALL' ? 'TODOS' : tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Estados reactivos */}
-      {isLoading && (
-        <View style={styles.feedbackRow}>
-          <ActivityIndicator size="small" color="#2E86C1" />
-          <Text style={styles.feedbackText}>CONSULTANDO ENDPOINT REST...</Text>
-        </View>
-      )}
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠ ERROR DE RED: {error}</Text>
-          <Text style={styles.errorSub}>Mostrando respaldo local de contingencia.</Text>
-        </View>
-      )}
-
-      {/* Despachos */}
-      {filteredDispatches.length === 0 && !isLoading ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>NO SE ENCONTRARON REGISTROS CON EL FILTRO DADO</Text>
-        </View>
+      {subTab === 'HARDWARE_LOGS' ? (
+        <HardwareSystemLogsViewer />
       ) : (
-        filteredDispatches.map((item) => {
-          const badge = getBadgeStyle(item.source);
-          return (
-            <View key={`${item.source}-${item.id}`} style={styles.dispatchCard}>
-              <View style={styles.rowBetween}>
-                <Text style={[styles.sourceBadge, { borderColor: badge.color, color: badge.color }]}>
-                  {badge.label}
-                </Text>
-                <Text style={styles.timestampText}>{item.timestamp}</Text>
-              </View>
-              <Text style={styles.dispatchSector}>REF: {item.sector} // ID #{item.id}</Text>
-              <Text style={styles.dispatchTitle}>{item.title}</Text>
-              <Text style={styles.dispatchBody}>{item.body}</Text>
+        <>
+          {/* Telemetría climática Open-Meteo */}
+          <View style={styles.weatherCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.weatherTitle}>TELEMETRÍA ATMOSFÉRICA // PORTWALL</Text>
+              <Text style={[styles.statusBadge, { color: weather?.isOnline ? colors.crtGreen : '#f59e0b' }]}>
+                {weather?.isOnline ? '● EN LÍNEA' : '▲ MODO LOCAL'}
+              </Text>
             </View>
-          );
-        })
+            <Text style={styles.weatherTemp}>
+              {weather ? `${weather.temperature}°C` : '--.-°C'}
+              <Text style={styles.weatherCondition}> | {weather?.condition || 'CALIBRANDO...'}</Text>
+            </Text>
+            <Text style={styles.weatherSub}>Viento: {weather?.windspeed ?? '--'} km/h | Satélite C.S.T. Nodo-4</Text>
+          </View>
+
+          {/* Matriz de almacenamiento */}
+          <View style={styles.matrixBox}>
+            <Text style={styles.sectionHeading}>ARQUITECTURA DE ALMACENAMIENTO</Text>
+            <Text style={styles.matrixCaption}>Caché en AsyncStorage: {cacheCount} registros</Text>
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity style={styles.btnAction} onPress={loadCloudData}>
+                <Text style={styles.btnActionText}>[ ↻ SYNC NUBE ]</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnAction} onPress={handleSaveToCache}>
+                <Text style={styles.btnActionText}>[ 💾 CACHEAR ]</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnAction} onPress={handleLoadFromCache}>
+                <Text style={styles.btnActionText}>[ 📂 CARGAR CACHÉ ]</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnAction} onPress={handleLoadLocalFallback}>
+                <Text style={styles.btnActionText}>[ ⚡ FORZAR LOCAL ]</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Filtros y búsqueda */}
+          <View style={styles.searchSection}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="BUSCAR EN COMUNICADOS POR PALABRA O SECTOR..."
+              placeholderTextColor="#475569"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="characters"
+            />
+            <View style={styles.filterTabs}>
+              {(['ALL', 'CLOUD', 'CACHE', 'LOCAL'] as FilterType[]).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.filterChip, activeFilter === tab && styles.filterChipActive]}
+                  onPress={() => setActiveFilter(tab)}
+                >
+                  <Text style={[styles.filterChipText, activeFilter === tab && styles.filterChipTextActive]}>
+                    {tab === 'ALL' ? 'TODOS' : tab}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {isLoading && (
+            <View style={styles.feedbackRow}>
+              <ActivityIndicator size="small" color="#2E86C1" />
+              <Text style={styles.feedbackText}>CONSULTANDO ENDPOINT REST...</Text>
+            </View>
+          )}
+          {error && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>⚠ ERROR DE RED: {error}</Text>
+              <Text style={styles.errorSub}>Mostrando respaldo local de contingencia.</Text>
+            </View>
+          )}
+
+          {filteredDispatches.length === 0 && !isLoading ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>NO SE ENCONTRARON REGISTROS CON EL FILTRO DADO</Text>
+            </View>
+          ) : (
+            filteredDispatches.map((item) => {
+              const badge = getBadgeStyle(item.source);
+              return (
+                <View key={`${item.source}-${item.id}`} style={styles.dispatchCard}>
+                  <View style={styles.rowBetween}>
+                    <Text style={[styles.sourceBadge, { borderColor: badge.color, color: badge.color }]}>
+                      {badge.label}
+                    </Text>
+                    <Text style={styles.timestampText}>{item.timestamp}</Text>
+                  </View>
+                  <Text style={styles.dispatchSector}>REF: {item.sector} // ID #{item.id}</Text>
+                  <Text style={styles.dispatchTitle}>{item.title}</Text>
+                  <Text style={styles.dispatchBody}>{item.body}</Text>
+                </View>
+              );
+            })
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -212,6 +245,14 @@ export const NetworkTerminalTab: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060a12' },
   content: { padding: scale(14), paddingBottom: verticalScale(40) },
+  subTabRow: { flexDirection: 'row', gap: scale(6), marginBottom: verticalScale(10) },
+  subTabBtn: {
+    flex: 1, paddingVertical: verticalScale(6), alignItems: 'center',
+    backgroundColor: '#0A121D', borderWidth: 1, borderColor: '#1E293B',
+  },
+  subTabBtnActive: { backgroundColor: '#1E3A8A', borderColor: '#38BDF8' },
+  subTabBtnText: { fontFamily: TYPOGRAPHY.systemPC, fontSize: moderateScale(7.5), color: '#94A3B8' },
+  subTabBtnTextActive: { color: '#F8FAFC', fontWeight: 'bold' },
   weatherCard: {
     backgroundColor: '#0a101d', borderWidth: 1, borderColor: '#1e293b',
     borderLeftWidth: 3, borderLeftColor: '#2E86C1', padding: scale(10),

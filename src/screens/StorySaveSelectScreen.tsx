@@ -69,7 +69,7 @@ export const StorySaveSelectScreen = ({ navigation }: Props) => {
       navigation.navigate('OperatorRegistration');
     } else if (selectedId && saveGame) {
       // Continuar partida
-      navigation.navigate('WeeklyIntro', { weekNumber: saveGame.currentDay });
+      navigation.navigate('DailyIntro', { dayNumber: saveGame.currentDay });
     }
   };
 
